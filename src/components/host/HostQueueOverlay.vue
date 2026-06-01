@@ -41,6 +41,22 @@ async function handleReorder(songId: string, direction: ReorderDirection) {
 
     <div class="flex-1 overflow-hidden">
       <ScrollArea max-height="100%">
+        <!-- History -->
+        <div v-if="store.historySongs.length > 0" class="px-3 py-2">
+          <p class="mb-1 px-3 text-xs font-medium uppercase tracking-wider text-[hsl(var(--foreground-subtle))]">
+            History
+          </p>
+          <div class="divide-y divide-white/5">
+            <HistorySongRow
+              v-for="song in store.historySongs"
+              :key="song.id"
+              :song="song"
+            />
+          </div>
+        </div>
+
+        <Separator v-if="store.historySongs.length > 0" />
+
         <!-- Now Playing -->
         <div v-if="store.currentSong" class="px-3 py-2">
           <p class="mb-2 px-3 text-xs font-medium uppercase tracking-wider text-[hsl(var(--foreground-subtle))]">
@@ -80,22 +96,6 @@ async function handleReorder(songId: string, direction: ReorderDirection) {
               :is-deleting="deletingIds.has(song.id) || reorderingIds.has(song.id)"
               @delete="handleDelete"
               @reorder="handleReorder"
-            />
-          </div>
-        </div>
-
-        <Separator v-if="store.historySongs.length > 0" />
-
-        <!-- History -->
-        <div v-if="store.historySongs.length > 0" class="px-3 py-2">
-          <p class="mb-1 px-3 text-xs font-medium uppercase tracking-wider text-[hsl(var(--foreground-subtle))]">
-            History
-          </p>
-          <div class="divide-y divide-white/5">
-            <HistorySongRow
-              v-for="song in store.historySongs"
-              :key="song.id"
-              :song="song"
             />
           </div>
         </div>

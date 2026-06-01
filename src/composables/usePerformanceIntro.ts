@@ -71,8 +71,7 @@ export function usePerformanceIntro(player: {
     timeouts.push(window.setTimeout(() => {
       if (!state.value.isRunning) return
 
-
-      player.setVolume(30)
+      player.setVolume(100)
       const duration = player.getDuration()
 
       if (duration > 0) {
@@ -84,6 +83,7 @@ export function usePerformanceIntro(player: {
       timeouts.push(window.setTimeout(() => {
         state.value.isDimmed = true
         state.value.isZoomed = false
+        playSwoosh()
 
         // 5.2s: Reveal title
         timeouts.push(window.setTimeout(() => {
@@ -93,24 +93,80 @@ export function usePerformanceIntro(player: {
         // 5.2s: Swoosh
         timeouts.push(window.setTimeout(() => {
           playSwoosh()
-        }, 600))
+        }, 550))
 
         // 6.2s: Reveal name
         timeouts.push(window.setTimeout(() => {
+          state.value.isTitleVisible = false
           state.value.isArtistVisible = true
-        }, 1400))
+        }, 3800))
 
         // 6.2s: Swoosh
         timeouts.push(window.setTimeout(() => {
           playSwoosh()
-        }, 1500))
+        }, 3850))
 
-      }, 2000)) // 0.5s initial + 4.5s = 5.0s total
+        // 6.2s: Hide name
+        timeouts.push(window.setTimeout(() => {
+          state.value.isArtistVisible = false
+        }, 5800))
+
+        // 5.2s: Swoosh
+        timeouts.push(window.setTimeout(() => {
+          playSwoosh()
+        }, 5850))
+
+        // 6.2s: Undim the screen
+        timeouts.push(window.setTimeout(() => {
+          state.value.isDimmed = false
+        }, 5000))
+
+        // 6.2s: Music fade out
+        timeouts.push(window.setTimeout(() => {
+          player.setVolume(80)
+        }, 5300))
+
+        // 6.2s: Music fade out
+        timeouts.push(window.setTimeout(() => {
+          player.setVolume(50)
+        }, 5400))
+
+        // 6.2s: Music fade out
+        timeouts.push(window.setTimeout(() => {
+          player.setVolume(30)
+        }, 5500))
+
+        // 6.2s: Music fade out
+        timeouts.push(window.setTimeout(() => {
+          player.setVolume(20)
+        }, 5600))
+
+        // 6.2s: Music fade out
+        timeouts.push(window.setTimeout(() => {
+          player.setVolume(15)
+        }, 5700))
+
+        // 6.2s: Music fade out
+        timeouts.push(window.setTimeout(() => {
+          player.setVolume(10)
+        }, 5800))
+
+        // 6.2s: Music fade out
+        timeouts.push(window.setTimeout(() => {
+          player.setVolume(5)
+        }, 5900))
+
+        // 6.2s: Music fade out
+        timeouts.push(window.setTimeout(() => {
+          player.setVolume(0)
+        }, 6000))
+
+      }, 1000)) // 0.5s initial + 4.5s = 5.0s total
 
       // 10.0s: End intro, start song
       timeouts.push(window.setTimeout(() => {
         skipIntro()
-      }, 5000))
+      }, 6500))
 
     }, 1000))
   }

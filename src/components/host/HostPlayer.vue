@@ -73,7 +73,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="relative h-full w-full bg-black transition-all duration-1000 ease-in-out"
+  <div class="relative h-full w-full bg-black transition-all duration-1500 ease-in-out"
     :class="introState.isZoomed ? 'scale-200 translate-y-1/4' : 'scale-100 translate-y-0'">
     <!-- YouTube player container -->
     <div :id="PLAYER_ID" class="absolute inset-0 h-full w-full" />

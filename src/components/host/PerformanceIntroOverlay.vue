@@ -20,24 +20,24 @@ const emit = defineEmits<{
 <template>
   <div
     v-if="isRunning"
-    class="pointer-events-none absolute inset-0 z-50 flex flex-col items-center justify-center transition-all duration-1000 ease-in-out"
+    class="pointer-events-none absolute inset-0 z-50 flex flex-col items-center justify-center transition-all duration-1500 ease-in-out"
     :class="[
       isDimmed ? 'bg-black/80 backdrop-blur-md' : 'bg-transparent',
     ]"
   >
     <!-- Reveal Text -->
-    <div class="flex flex-col items-center justify-center space-y-12 px-8 text-center max-w-3/4">
+    <div class="flex flex-col items-center justify-center px-8 text-center max-w-3/4">
       <h2
-        class="text-4xl font-bold text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.5)] md:text-6xl transition-all duration-1000 ease-in-out"
-        :class="isTitleVisible ? 'scale-100 opacity-100 translate-y-0' : 'scale-90 opacity-0 blur-3xl translate-y-8'"
+        class="text-4xl font-bold text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.5)] md:text-6xl transition-all duration-1500 ease-in-out"
+        :class="isTitleVisible ? 'scale-100 opacity-100 translate-y-0' : 'scale-200 opacity-0 blur-lg translate-y-8'"
       >
         {{ songTitle }}
       </h2>
       <p
-        class="text-xl font-medium text-zinc-300 drop-shadow-md md:text-2xl transition-all duration-1000 ease-in-out"
-        :class="isArtistVisible ? 'scale-100 opacity-100 translate-y-0' : 'scale-90 opacity-0 blur-3xl translate-y-8'"
+        class="absolute text-4xl font-medium text-zinc-300 drop-shadow-[0_0_15px_rgba(255,255,255,0.5)] md:text-6xl transition-all duration-1000 ease-in-out"
+        :class="isArtistVisible ? 'scale-100 opacity-100 tracking-normal' : 'scale-200 opacity-0 tracking-widest'"
       >
-        Performed by <span class="text-purple-400">{{ performerName }}</span>
+        By <span class="text-purple-400">{{ performerName }}</span>
       </p>
     </div>
 
