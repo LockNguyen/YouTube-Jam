@@ -1,0 +1,29 @@
+[build]
+  command = "npm run build-only"
+  publish = "dist"
+  functions = "netlify/functions"
+
+[dev]
+  command = "npm run dev:vite"
+  port = 8888
+  targetPort = 5173
+  framework = "#custom"
+  autoLaunch = false
+
+[functions]
+  node_bundler = "esbuild"
+  external_node_modules = ["firebase-admin"]
+
+# SPA fallback — serve index.html for all non-asset routes
+# This is what makes /host and / work without a real server
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[[headers]]
+  for = "/.netlify/functions/*"
+  [headers.values]
+    Access-Control-Allow-Origin = "*"
+    Access-Control-Allow-Headers = "Content-Type, x-host-key"
+    Access-Control-Allow-Methods = "POST, OPTIONS"
