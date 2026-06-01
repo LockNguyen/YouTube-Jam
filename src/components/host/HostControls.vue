@@ -20,7 +20,7 @@ const emit = defineEmits<{
   'toggle-queue': []
 }>()
 
-const { skip, previous, clearQueue, isLoading, lastError } = useHostActions()
+const { skip, previous, clearQueue, isLoading, lastError, setPerformanceMode } = useHostActions()
 
 const isSkipping = ref(false)
 const isGoingBack = ref(false)
@@ -40,6 +40,14 @@ async function handlePrevious() {
 async function handleClear() {
   if (!confirm('Clear all upcoming songs from the queue?')) return
   await clearQueue()
+}
+
+import { useQueueStore } from '@/stores/queue.store'
+const queueStore = useQueueStore()
+
+async function togglePerformanceMode() {
+  const nextMode = !queueStore.performanceMode
+  await setPerformanceMode(nextMode)
 }
 </script>
 
@@ -116,6 +124,19 @@ async function handleClear() {
           @click="handleClear"
         >
           <span class="text-lg">🗑</span>
+        </Button>
+
+        <Button
+          id="host-perf-toggle-btn"
+          variant="outline"
+          size="sm"
+          class="ml-2 gap-2 border-[hsl(var(--border))] hover:bg-white/10"
+          :class="queueStore.performanceMode ? 'bg-purple-500/20 text-purple-300 border-purple-500/50 hover:bg-purple-500/30' : ''"
+          title="Toggle Performance Mode"
+          :disabled="isLoading"
+          @click="togglePerformanceMode"
+        >
+          ✨ Performance Mode
         </Button>
       </div>
     </div>

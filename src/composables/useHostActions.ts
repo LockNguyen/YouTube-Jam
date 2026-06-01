@@ -49,5 +49,6 @@ export function useHostActions() {
     reorderSong: (songId: string, direction: ReorderDirection) =>
       run((k) => queueApi.reorderQueue(k, songId, direction)),
     setNowPlaying: (songId: string | null) => run((k) => queueApi.setNowPlaying(k, songId)),
+    setPerformanceMode: (enabled: boolean) => run((k) => queueApi.setPerformanceMode(k, enabled)),
   }
 }

@@ -25,7 +25,9 @@ export async function addSong(
   videoId: string,
   title: string | null,
   thumbnailUrl: string | null,
-  submittedBy: string | null,
+  guestId: string,
+  name: string,
+  color: string,
 ): Promise<string> {
   const songs = await getAllSongs()
   const queued = songs.filter((s) => s.status === 'queued' || s.status === 'playing')
@@ -41,7 +43,9 @@ export async function addSong(
     status: 'queued',
     order: maxOrder + 1000,
     submittedAt: now(),
-    submittedBy,
+    submittedByGuestId: guestId,
+    submittedByName: name,
+    submittedByColor: color,
     startedAt: null,
     endedAt: null,
     deletedAt: null,
@@ -77,11 +81,10 @@ export async function markSongAs(
 }
 
 export async function setCurrentSong(songId: string | null): Promise<void> {
-  const state: QueueState = {
+  await adminDb.ref('state').update({
     currentSongId: songId,
     updatedAt: now(),
-  }
-  await adminDb.ref('state').set(state)
+  })
 }
 
 export async function performSkip(): Promise<{ nextSongId: string | null }> {
@@ -127,7 +130,22 @@ export async function performPrevious(): Promise<{ previousSongId: string | null
   return { previousSongId: previous.id }
 }
 
-export async function performDelete(songId: string): Promise<void> {
+export async function performDelete(songId: string, guestId?: string): Promise<{ ok: boolean; error?: string }> {
+  const songs = await getAllSongs()
+  const song = songs.find((s) => s.id === songId)
+  
+  if (!song) return { ok: false, error: 'Song not found' }
+
+  // Guest permission check
+  if (guestId) {
+    if (song.submittedByGuestId !== guestId) {
+      return { ok: false, error: 'Cannot delete someone else’s song' }
+    }
+    if (song.status !== 'queued') {
+      return { ok: false, error: 'Guests can only delete queued songs' }
+    }
+  }
+
   const state = await getState()
   const isCurrentSong = state?.currentSongId === songId
 
@@ -140,21 +158,26 @@ export async function performDelete(songId: string): Promise<void> {
     }
     await setCurrentSong(next?.id ?? null)
   }
+  
+  return { ok: true }
 }
 
 export async function performSetNowPlaying(songId: string | null): Promise<void> {
-  const state = await getState()
-  const currentId = state?.currentSongId
+  const songs = await getAllSongs()
+  const queued = songs.filter((s) => s.status === 'queued')
+  const next = queued.find((s) => s.id === songId) ?? null
 
-  if (currentId && currentId !== songId) {
-    await markSongAs(currentId, 'played', { endedAt: now() })
+  await setCurrentSong(next?.id ?? null)
+  if (next) {
+    await markSongAs(next.id, 'playing', { startedAt: now() })
   }
+}
 
-  if (songId) {
-    await markSongAs(songId, 'playing', { startedAt: now() })
-  }
-
-  await setCurrentSong(songId)
+export async function setPerformanceMode(enabled: boolean): Promise<void> {
+  await adminDb.ref('state').update({
+    performanceMode: enabled,
+    updatedAt: now(),
+  })
 }
 
 export async function performClearQueue(): Promise<void> {

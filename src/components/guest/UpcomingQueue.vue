@@ -1,11 +1,32 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useQueueStore } from '@/stores/queue.store'
+import { useGuestProfileStore } from '@/stores/guestProfile.store'
+import { deleteSongAsGuest, reorderQueueAsGuest } from '@/services/queue.api'
+import type { ReorderDirection } from '@/types/queue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import ScrollArea from '@/components/ui/ScrollArea.vue'
+import QueueSongRow from '@/components/host/QueueSongRow.vue'
 
 const store = useQueueStore()
+const profileStore = useGuestProfileStore()
 const queued = computed(() => store.queuedSongs)
+
+const processingIds = ref<Set<string>>(new Set())
+
+async function handleDelete(songId: string) {
+  if (!profileStore.profile) return
+  processingIds.value.add(songId)
+  await deleteSongAsGuest(songId, profileStore.profile.guestId)
+  processingIds.value.delete(songId)
+}
+
+async function handleReorder(songId: string, direction: ReorderDirection) {
+  if (!profileStore.profile) return
+  processingIds.value.add(songId)
+  await reorderQueueAsGuest(songId, direction, profileStore.profile.guestId)
+  processingIds.value.delete(songId)
+}
 </script>
 
 <template>
@@ -31,35 +52,19 @@ const queued = computed(() => store.queuedSongs)
 
       <ScrollArea v-else max-height="360px">
         <ul class="divide-y divide-[hsl(var(--border))]">
-          <li
+          <QueueSongRow
             v-for="(song, index) in queued"
             :key="song.id"
-            class="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-[hsl(var(--background-overlay))]"
-          >
-            <!-- Position -->
-            <span class="w-5 flex-shrink-0 text-center text-xs font-medium text-[hsl(var(--foreground-subtle))]">
-              {{ index + 1 }}
-            </span>
-
-            <!-- Thumbnail -->
-            <img
-              v-if="song.thumbnailUrl"
-              :src="song.thumbnailUrl"
-              :alt="song.title ?? 'Song'"
-              class="h-10 w-16 flex-shrink-0 rounded-md object-cover"
-            />
-            <div
-              v-else
-              class="flex h-10 w-16 flex-shrink-0 items-center justify-center rounded-md bg-[hsl(var(--background-overlay))] text-lg"
-            >
-              🎵
-            </div>
-
-            <!-- Title -->
-            <p class="min-w-0 flex-1 truncate text-sm text-[hsl(var(--foreground))]">
-              {{ song.title ?? 'Unknown Song' }}
-            </p>
-          </li>
+            :song="song"
+            :position="index + 1"
+            :is-first="index === 0"
+            :is-last="index === queued.length - 1"
+            :is-deleting="processingIds.has(song.id)"
+            :show-reorder="true"
+            :show-delete="song.submittedByGuestId === profileStore.profile?.guestId"
+            @delete="handleDelete"
+            @reorder="handleReorder"
+          />
         </ul>
       </ScrollArea>
     </div>

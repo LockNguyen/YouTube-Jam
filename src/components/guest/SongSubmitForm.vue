@@ -4,15 +4,18 @@ import { useQueueStore } from '@/stores/queue.store'
 import { useSongValidation } from '@/composables/useSongValidation'
 import { submitSong } from '@/services/queue.api'
 import { extractVideoId } from '@/utils/youtubeUrl'
+import { useGuestProfileStore } from '@/stores/guestProfile.store'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 
 const store = useQueueStore()
-const { url, error, isValid, validate, clear } = useSongValidation()
+const profileStore = useGuestProfileStore()
 
 const isSubmitting = ref(false)
 const successMessage = ref<string | null>(null)
 const submitError = ref<string | null>(null)
+
+const { url, error, isValid, validate, clear } = useSongValidation()
 
 /** Check if this video is already in the queue */
 const isDuplicate = computed(() => {
@@ -27,14 +30,26 @@ async function handleSubmit() {
 
   if (!validate()) return
 
+  if (!profileStore.profile) {
+    submitError.value = 'Guest profile missing'
+    isSubmitting.value = false
+    return
+  }
+
   isSubmitting.value = true
   try {
-    const result = await submitSong({ youtubeUrl: url.value, submittedBy: null })
-    if (result.ok) {
+    const res = await submitSong({
+      youtubeUrl: url.value,
+      guestId: profileStore.profile.guestId,
+      name: profileStore.profile.name,
+      color: profileStore.profile.color,
+    })
+    
+    if (res.ok) {
       successMessage.value = 'Song added to the queue!'
       clear()
     } else {
-      submitError.value = result.error ?? 'Failed to add song. Please try again.'
+      submitError.value = res.error ?? 'Failed to add song. Please try again.'
     }
   } catch {
     submitError.value = 'Network error. Please check your connection.'

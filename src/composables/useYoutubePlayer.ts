@@ -26,6 +26,9 @@ interface YTPlayerInstance {
   seekTo(seconds: number, allowSeekAhead: boolean): void
   loadVideoById(videoId: string): void
   getPlayerState(): number
+  getDuration(): number
+  setVolume(volume: number): void
+  getVolume(): number
   destroy(): void
 }
 
@@ -163,6 +166,22 @@ export function useYouTubePlayer(options: UseYouTubePlayerOptions = {}) {
     return player?.getPlayerState() ?? -1
   }
 
+  function getDuration(): number {
+    return player?.getDuration() ?? 0
+  }
+
+  function seekTo(seconds: number) {
+    player?.seekTo(seconds, true)
+  }
+
+  function getVolume(): number {
+    return player?.getVolume() ?? 100
+  }
+
+  function setVolume(volume: number) {
+    player?.setVolume(volume)
+  }
+
   function destroy() {
     if (player) {
       player.destroy()
@@ -185,6 +204,10 @@ export function useYouTubePlayer(options: UseYouTubePlayerOptions = {}) {
     pause,
     restart,
     getState,
+    getDuration,
+    seekTo,
+    getVolume,
+    setVolume,
     destroy,
   }
 }

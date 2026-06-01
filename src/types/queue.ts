@@ -4,10 +4,13 @@ export type ReorderDirection = 'up' | 'down' | 'top' | 'bottom'
 
 export interface SubmitSongPayload {
   youtubeUrl: string
-  submittedBy: string | null
+  guestId: string
+  name: string
+  color: string
 }
 
 export interface ReorderPayload {
   songId: string
+  guestId: string
   direction: ReorderDirection
 }

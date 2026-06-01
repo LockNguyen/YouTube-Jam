@@ -8,15 +8,24 @@ export interface Song {
   status: SongStatus
   order: number
   submittedAt: number
-  submittedBy: string | null
+  submittedByGuestId: string
+  submittedByName: string
+  submittedByColor: string
   startedAt: number | null
   endedAt: number | null
   deletedAt: number | null
 }
 
+export interface GuestProfile {
+  guestId: string
+  name: string
+  color: string
+}
+
 export interface QueueState {
   currentSongId: string | null
   updatedAt: number
+  performanceMode: boolean
 }
 
 export interface ApiResponse<T = unknown> {

@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import type { Song } from '@/types/song'
 import type { ReorderDirection } from '@/types/queue'
+import { useQueueStore } from '@/stores/queue.store'
 import Button from '@/components/ui/Button.vue'
+
+const queueStore = useQueueStore()
 
 interface Props {
   song: Song
@@ -9,12 +12,16 @@ interface Props {
   isFirst?: boolean
   isLast?: boolean
   isDeleting?: boolean
+  showReorder?: boolean
+  showDelete?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   isFirst: false,
   isLast: false,
   isDeleting: false,
+  showReorder: true,
+  showDelete: true,
 })
 
 const emit = defineEmits<{
@@ -44,13 +51,26 @@ const emit = defineEmits<{
       🎵
     </div>
 
-    <!-- Title -->
-    <p class="min-w-0 flex-1 truncate text-xs font-medium text-[hsl(var(--foreground))]">
-      {{ song.title ?? 'Unknown Song' }}
-    </p>
+    <!-- Title & Submitter -->
+    <div class="min-w-0 flex-1 flex flex-col justify-center">
+      <p class="truncate text-xs font-medium text-[hsl(var(--foreground))]">
+        {{ song.title ?? 'Unknown Song' }}
+      </p>
+      <div v-if="song.submittedByName && !queueStore.performanceMode" class="mt-1 flex items-center gap-1.5 text-[10px] text-[hsl(var(--foreground-muted))]">
+        <span
+          class="h-2 w-2 rounded-full inline-block"
+          :style="{ backgroundColor: song.submittedByColor }"
+        ></span>
+        <span class="truncate">{{ song.submittedByName }}</span>
+      </div>
+      <div v-else-if="queueStore.performanceMode" class="mt-1 text-[10px] italic text-[hsl(var(--foreground-muted))]">
+        Surprise Performer
+      </div>
+    </div>
 
     <!-- Reorder buttons -->
-    <div class="flex flex-shrink-0 items-center gap-0.5">
+    <div v-if="showReorder || showDelete" class="flex flex-shrink-0 items-center gap-0.5">
+      <template v-if="showReorder">
       <Button
         variant="ghost"
         size="icon"
@@ -84,8 +104,11 @@ const emit = defineEmits<{
         @click="emit('reorder', song.id, 'bottom')"
       >⤓</Button>
 
+      </template>
+
       <!-- Delete -->
       <Button
+        v-if="showDelete"
         variant="ghost"
         size="icon"
         class="h-7 w-7 text-red-400 hover:text-red-300 hover:bg-red-500/10"

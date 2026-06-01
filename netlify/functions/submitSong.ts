@@ -1,6 +1,7 @@
 import type { Handler } from '@netlify/functions'
 import { addSong } from '../shared/queueService'
 import { parseBody, requireString } from '../shared/validation'
+import { GUEST_COLORS } from '../../src/constants/guestColors'
 import { success, error, headers } from '../shared/responses'
 import { extractVideoId } from '../../src/utils/youtubeUrl'
 
@@ -16,9 +17,17 @@ const handler: Handler = async (event) => {
 
   const body = parseBody(event.body)
   const youtubeUrl = requireString(body, 'youtubeUrl')
+  const guestId = requireString(body, 'guestId')
+  const name = requireString(body, 'name')
+  const color = requireString(body, 'color')
 
-  if (!youtubeUrl) {
-    return { ...error('youtubeUrl is required'), headers }
+  if (!youtubeUrl || !guestId || !name || !color) {
+    return { ...error('Missing required fields: youtubeUrl, guestId, name, color'), headers }
+  }
+
+  // Basic color validation
+  if (!GUEST_COLORS.includes(color as any)) {
+    return { ...error('Invalid color'), headers }
   }
 
   const videoId = extractVideoId(youtubeUrl)
@@ -43,7 +52,7 @@ const handler: Handler = async (event) => {
   }
 
   try {
-    const songId = await addSong(videoId, title, thumbnailUrl, null)
+    const songId = await addSong(videoId, title, thumbnailUrl, guestId, name, color)
     return { ...success({ songId, videoId, title, thumbnailUrl }), headers }
   } catch (err) {
     console.error('[submitSong] Error:', err)

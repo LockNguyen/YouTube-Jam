@@ -45,7 +45,19 @@ async function post<T>(
 // ─── Guest actions ──────────────────────────────────────────────────────────
 
 export async function submitSong(payload: SubmitSongPayload): Promise<ApiResponse> {
-  return post('submitSong', { youtubeUrl: payload.youtubeUrl, submittedBy: payload.submittedBy })
+  return post('submitSong', payload as unknown as Record<string, unknown>)
+}
+
+export async function deleteSongAsGuest(songId: string, guestId: string): Promise<ApiResponse> {
+  return post('deleteSong', { songId, guestId })
+}
+
+export async function reorderQueueAsGuest(
+  songId: string,
+  direction: ReorderDirection,
+  guestId: string,
+): Promise<ApiResponse> {
+  return post('reorderQueue', { songId, direction, guestId })
 }
 
 // ─── Host actions ────────────────────────────────────────────────────────────
@@ -76,4 +88,8 @@ export async function reorderQueue(
 
 export async function setNowPlaying(hostKey: string, songId: string | null): Promise<ApiResponse> {
   return post('setNowPlaying', { songId }, hostKey)
+}
+
+export async function setPerformanceMode(hostKey: string, enabled: boolean): Promise<ApiResponse> {
+  return post('setPerformanceMode', { enabled }, hostKey)
 }

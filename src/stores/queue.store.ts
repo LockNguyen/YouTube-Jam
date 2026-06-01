@@ -8,6 +8,7 @@ export const useQueueStore = defineStore('queue', () => {
   // ─── State ──────────────────────────────────────────────────────────────────
   const songs = ref<Song[]>([])
   const currentSongId = ref<string | null>(null)
+  const performanceMode = ref<boolean>(false)
   const isLoading = ref(true)
   const error = ref<string | null>(null)
 
@@ -47,6 +48,7 @@ export const useQueueStore = defineStore('queue', () => {
       (snapshot) => {
         const raw = snapshot.val() as QueueState | null
         currentSongId.value = raw?.currentSongId ?? null
+        performanceMode.value = raw?.performanceMode ?? false
       },
       (err) => {
         error.value = err.message
@@ -91,6 +93,7 @@ export const useQueueStore = defineStore('queue', () => {
     // state
     songs,
     currentSongId,
+    performanceMode,
     isLoading,
     error,
     // actions
