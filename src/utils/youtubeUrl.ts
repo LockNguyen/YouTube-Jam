@@ -8,33 +8,14 @@
  * Returns null for invalid or unrecognized URLs.
  */
 export function extractVideoId(url: string): string | null {
-  if (!url || typeof url !== 'string') return null
+  if (!url || typeof url !== 'string') return null;
 
-  const trimmed = url.trim()
+  // A single, robust regular expression to match YouTube's 11-character video IDs
+  const regex = /(?:youtu\.be\/|youtube(?:-nocookie)?\.com\/(?:embed\/|v\/|shorts\/|live\/|.*[?&]v=))([a-zA-Z0-9_-]{11})/i;
 
-  // youtu.be/VIDEO_ID
-  const shortMatch = trimmed.match(/^(?:https?:\/\/)?youtu\.be\/([a-zA-Z0-9_-]{11})(?:[?&].*)?$/)
-  if (shortMatch) return shortMatch[1] ?? null
+  const match = url.trim().match(regex);
 
-  // youtube.com/watch?v=VIDEO_ID
-  const watchMatch = trimmed.match(
-    /^(?:https?:\/\/)?(?:www\.)?youtube\.com\/watch\?.*v=([a-zA-Z0-9_-]{11})(?:[&].*)?$/,
-  )
-  if (watchMatch) return watchMatch[1] ?? null
-
-  // youtube.com/shorts/VIDEO_ID
-  const shortsMatch = trimmed.match(
-    /^(?:https?:\/\/)?(?:www\.)?youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})(?:[?/].*)?$/,
-  )
-  if (shortsMatch) return shortsMatch[1] ?? null
-
-  // youtube.com/embed/VIDEO_ID
-  const embedMatch = trimmed.match(
-    /^(?:https?:\/\/)?(?:www\.)?youtube\.com\/embed\/([a-zA-Z0-9_-]{11})(?:[?/].*)?$/,
-  )
-  if (embedMatch) return embedMatch[1] ?? null
-
-  return null
+  return match?.[1] ?? null;
 }
 
 export function isValidYoutubeUrl(url: string): boolean {
