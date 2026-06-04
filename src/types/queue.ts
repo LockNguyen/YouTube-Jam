@@ -7,6 +7,8 @@ export interface SubmitSongPayload {
   guestId: string
   name: string
   color: string
+  title?: string | null
+  thumbnailUrl?: string | null
 }
 
 export interface ReorderPayload {

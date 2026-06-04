@@ -1,12 +1,11 @@
 import type { Handler } from '@netlify/functions'
 import { addSong } from '../shared/queueService'
 import { parseBody, requireString } from '../shared/validation'
-import { GUEST_COLORS } from '../../src/constants/guestColors'
+import { verifyProfile } from '../shared/guestAuth'
 import { success, error, headers } from '../shared/responses'
 import { extractVideoId } from '../../src/utils/youtubeUrl'
 
 const handler: Handler = async (event) => {
-  // CORS preflight
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 204, headers }
   }
@@ -17,17 +16,13 @@ const handler: Handler = async (event) => {
 
   const body = parseBody(event.body)
   const youtubeUrl = requireString(body, 'youtubeUrl')
-  const guestId = requireString(body, 'guestId')
-  const name = requireString(body, 'name')
-  const color = requireString(body, 'color')
+  const roomId = requireString(body, 'roomId')
+  const token = requireString(body, 'token')
+  const clientTitle = requireString(body, 'title')
+  const clientThumbnailUrl = requireString(body, 'thumbnailUrl')
 
-  if (!youtubeUrl || !guestId || !name || !color) {
-    return { ...error('Missing required fields: youtubeUrl, guestId, name, color'), headers }
-  }
-
-  // Basic color validation
-  if (!GUEST_COLORS.includes(color as any)) {
-    return { ...error('Invalid color'), headers }
+  if (!youtubeUrl || !roomId || !token) {
+    return { ...error('Missing required fields: youtubeUrl, roomId, token'), headers }
   }
 
   const videoId = extractVideoId(youtubeUrl)
@@ -35,24 +30,18 @@ const handler: Handler = async (event) => {
     return { ...error('Invalid YouTube URL'), headers }
   }
 
-  // Fetch title + thumbnail via oEmbed (no API key needed)
-  let title: string | null = null
-  let thumbnailUrl: string | null = null
-
-  try {
-    const oembedUrl = `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`
-    const res = await fetch(oembedUrl)
-    if (res.ok) {
-      const data = (await res.json()) as { title: string; thumbnail_url: string }
-      title = data.title ?? null
-      thumbnailUrl = data.thumbnail_url ?? null
-    }
-  } catch {
-    // Continue without metadata — not a fatal error
+  // Cryptographically verify the guest profile token
+  const profile = verifyProfile(token, roomId)
+  if (!profile) {
+    return { ...error('Unauthorized: Invalid guest token', 401), headers }
   }
 
+  const { guestId, name, color } = profile
+  const title = clientTitle || 'Unknown Song'
+  const thumbnailUrl = clientThumbnailUrl || null
+
   try {
-    const songId = await addSong(videoId, title, thumbnailUrl, guestId, name, color)
+    const songId = await addSong(roomId, videoId, title, thumbnailUrl, guestId, name, color)
     return { ...success({ songId, videoId, title, thumbnailUrl }), headers }
   } catch (err) {
     console.error('[submitSong] Error:', err)

@@ -1,6 +1,6 @@
 import type { Handler } from '@netlify/functions'
 import { performClearQueue } from '../shared/queueService'
-import { validateHostKey } from '../shared/validation'
+import { validateHostKey, parseBody, requireString } from '../shared/validation'
 import { success, error, headers } from '../shared/responses'
 
 const handler: Handler = async (event) => {
@@ -16,8 +16,15 @@ const handler: Handler = async (event) => {
     return { ...error('Unauthorized', 401), headers }
   }
 
+  const body = parseBody(event.body)
+  const roomId = requireString(body, 'roomId')
+
+  if (!roomId) {
+    return { ...error('roomId is required'), headers }
+  }
+
   try {
-    await performClearQueue()
+    await performClearQueue(roomId)
     return { ...success({ cleared: true }), headers }
   } catch (err) {
     console.error('[clearQueue] Error:', err)

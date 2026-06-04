@@ -1,10 +1,12 @@
 import { ref, computed } from 'vue'
 import { useRoute } from 'vue-router'
+import { useQueueStore } from '@/stores/queue.store'
 import * as queueApi from '@/services/queue.api'
 import type { ReorderDirection } from '@/types/queue'
 
 export function useHostActions() {
   const route = useRoute()
+  const queueStore = useQueueStore()
 
   // Store the host key in memory only — never persisted to localStorage
   const hostKey = computed(() => {
@@ -36,19 +38,21 @@ export function useHostActions() {
     }
   }
 
+  const roomId = computed(() => queueStore.roomId ?? 'default')
+
   return {
     hostKey,
     isAuthorized,
     isLoading,
     lastError,
 
-    skip: () => run((k) => queueApi.skipSong(k)),
-    previous: () => run((k) => queueApi.previousSong(k)),
-    clearQueue: () => run((k) => queueApi.clearQueue(k)),
-    deleteSong: (songId: string) => run((k) => queueApi.deleteSong(k, songId)),
+    skip: () => run((k) => queueApi.skipSong(k, roomId.value)),
+    previous: () => run((k) => queueApi.previousSong(k, roomId.value)),
+    clearQueue: () => run((k) => queueApi.clearQueue(k, roomId.value)),
+    deleteSong: (songId: string) => run((k) => queueApi.deleteSong(k, songId, roomId.value)),
     reorderSong: (songId: string, direction: ReorderDirection) =>
-      run((k) => queueApi.reorderQueue(k, songId, direction)),
-    setNowPlaying: (songId: string | null) => run((k) => queueApi.setNowPlaying(k, songId)),
-    setPerformanceMode: (enabled: boolean) => run((k) => queueApi.setPerformanceMode(k, enabled)),
+      run((k) => queueApi.reorderQueue(k, songId, direction, roomId.value)),
+    setNowPlaying: (songId: string | null) => run((k) => queueApi.setNowPlaying(k, songId, roomId.value)),
+    setPerformanceMode: (enabled: boolean) => run((k) => queueApi.setPerformanceMode(k, enabled, roomId.value)),
   }
 }

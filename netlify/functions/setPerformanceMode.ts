@@ -1,6 +1,6 @@
 import type { Handler } from '@netlify/functions'
 import { setPerformanceMode } from '../shared/queueService'
-import { validateHostKey, parseBody } from '../shared/validation'
+import { validateHostKey, parseBody, requireString } from '../shared/validation'
 import { success, error, headers } from '../shared/responses'
 
 const handler: Handler = async (event) => {
@@ -18,13 +18,18 @@ const handler: Handler = async (event) => {
 
   const body = parseBody(event.body)
   const enabled = body.enabled
+  const roomId = requireString(body, 'roomId')
+
+  if (!roomId) {
+    return { ...error('roomId is required'), headers }
+  }
 
   if (typeof enabled !== 'boolean') {
     return { ...error('enabled boolean is required'), headers }
   }
 
   try {
-    await setPerformanceMode(enabled)
+    await setPerformanceMode(roomId, enabled)
     return { ...success({ enabled }), headers }
   } catch (err) {
     console.error('[setPerformanceMode] Error:', err)

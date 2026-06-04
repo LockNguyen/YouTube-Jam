@@ -44,52 +44,63 @@ async function post<T>(
 
 // ─── Guest actions ──────────────────────────────────────────────────────────
 
-export async function submitSong(payload: SubmitSongPayload): Promise<ApiResponse> {
+export async function registerGuest(payload: {
+  name: string
+  color: string
+  roomId: string
+  guestId?: string
+}): Promise<ApiResponse<{ guestId: string; name: string; color: string; roomId: string; token: string }>> {
+  return post('registerGuest', payload)
+}
+
+export async function submitSong(payload: SubmitSongPayload & { roomId: string; token: string }): Promise<ApiResponse> {
   return post('submitSong', payload as unknown as Record<string, unknown>)
 }
 
-export async function deleteSongAsGuest(songId: string, guestId: string): Promise<ApiResponse> {
-  return post('deleteSong', { songId, guestId })
+export async function deleteSongAsGuest(songId: string, token: string, roomId: string): Promise<ApiResponse> {
+  return post('deleteSong', { songId, token, roomId })
 }
 
 export async function reorderQueueAsGuest(
   songId: string,
   direction: ReorderDirection,
-  guestId: string,
+  token: string,
+  roomId: string,
 ): Promise<ApiResponse> {
-  return post('reorderQueue', { songId, direction, guestId })
+  return post('reorderQueue', { songId, direction, token, roomId })
 }
 
 // ─── Host actions ────────────────────────────────────────────────────────────
 
-export async function skipSong(hostKey: string): Promise<ApiResponse> {
-  return post('skipSong', {}, hostKey)
+export async function skipSong(hostKey: string, roomId: string): Promise<ApiResponse> {
+  return post('skipSong', { roomId }, hostKey)
 }
 
-export async function previousSong(hostKey: string): Promise<ApiResponse> {
-  return post('previousSong', {}, hostKey)
+export async function previousSong(hostKey: string, roomId: string): Promise<ApiResponse> {
+  return post('previousSong', { roomId }, hostKey)
 }
 
-export async function deleteSong(hostKey: string, songId: string): Promise<ApiResponse> {
-  return post('deleteSong', { songId }, hostKey)
+export async function deleteSong(hostKey: string, songId: string, roomId: string): Promise<ApiResponse> {
+  return post('deleteSong', { songId, roomId }, hostKey)
 }
 
-export async function clearQueue(hostKey: string): Promise<ApiResponse> {
-  return post('clearQueue', {}, hostKey)
+export async function clearQueue(hostKey: string, roomId: string): Promise<ApiResponse> {
+  return post('clearQueue', { roomId }, hostKey)
 }
 
 export async function reorderQueue(
   hostKey: string,
   songId: string,
   direction: ReorderDirection,
+  roomId: string,
 ): Promise<ApiResponse> {
-  return post('reorderQueue', { songId, direction }, hostKey)
+  return post('reorderQueue', { songId, direction, roomId }, hostKey)
 }
 
-export async function setNowPlaying(hostKey: string, songId: string | null): Promise<ApiResponse> {
-  return post('setNowPlaying', { songId }, hostKey)
+export async function setNowPlaying(hostKey: string, songId: string | null, roomId: string): Promise<ApiResponse> {
+  return post('setNowPlaying', { songId, roomId }, hostKey)
 }
 
-export async function setPerformanceMode(hostKey: string, enabled: boolean): Promise<ApiResponse> {
-  return post('setPerformanceMode', { enabled }, hostKey)
+export async function setPerformanceMode(hostKey: string, enabled: boolean, roomId: string): Promise<ApiResponse> {
+  return post('setPerformanceMode', { enabled, roomId }, hostKey)
 }

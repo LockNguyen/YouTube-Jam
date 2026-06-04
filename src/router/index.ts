@@ -7,15 +7,26 @@ const router = createRouter({
   routes: [
     {
       path: '/',
-      name: 'guest',
-      component: GuestView,
+      redirect: '/rooms/default',
     },
     {
       path: '/host',
+      redirect: '/rooms/default/host',
+    },
+    {
+      path: '/rooms/:roomId',
+      name: 'guest',
+      component: GuestView,
+      props: true,
+    },
+    {
+      path: '/rooms/:roomId/host',
       name: 'host',
       component: HostView,
+      props: true,
     },
   ],
 })
 
 export default router
+

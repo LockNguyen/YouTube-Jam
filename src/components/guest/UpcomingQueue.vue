@@ -17,14 +17,14 @@ const processingIds = ref<Set<string>>(new Set())
 async function handleDelete(songId: string) {
   if (!profileStore.profile) return
   processingIds.value.add(songId)
-  await deleteSongAsGuest(songId, profileStore.profile.guestId)
+  await deleteSongAsGuest(songId, profileStore.profile.token ?? '', store.roomId ?? 'default')
   processingIds.value.delete(songId)
 }
 
 async function handleReorder(songId: string, direction: ReorderDirection) {
   if (!profileStore.profile) return
   processingIds.value.add(songId)
-  await reorderQueueAsGuest(songId, direction, profileStore.profile.guestId)
+  await reorderQueueAsGuest(songId, direction, profileStore.profile.token ?? '', store.roomId ?? 'default')
   processingIds.value.delete(songId)
 }
 </script>

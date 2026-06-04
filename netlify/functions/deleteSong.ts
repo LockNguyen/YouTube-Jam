@@ -1,6 +1,7 @@
 import type { Handler } from '@netlify/functions'
 import { performDelete } from '../shared/queueService'
 import { validateHostKey, parseBody, requireString } from '../shared/validation'
+import { verifyProfile } from '../shared/guestAuth'
 import { success, error, headers } from '../shared/responses'
 
 const handler: Handler = async (event) => {
@@ -14,20 +15,30 @@ const handler: Handler = async (event) => {
 
   const body = parseBody(event.body)
   const songId = requireString(body, 'songId')
-  const guestId = requireString(body, 'guestId')
+  const roomId = requireString(body, 'roomId')
+  const token = requireString(body, 'token')
+
+  if (!songId || !roomId) {
+    return { ...error('songId and roomId are required'), headers }
+  }
 
   const isHost = validateHostKey(event.headers as Record<string, string | undefined>)
 
-  if (!isHost && !guestId) {
-    return { ...error('Unauthorized: Must provide guestId or valid host key', 401), headers }
-  }
-
-  if (!songId) {
-    return { ...error('songId is required'), headers }
-  }
-
   try {
-    const result = await performDelete(songId, isHost ? undefined : guestId ?? undefined)
+    let guestId: string | undefined = undefined
+
+    if (!isHost) {
+      if (!token) {
+        return { ...error('Unauthorized: Missing guest token or host key', 401), headers }
+      }
+      const profile = verifyProfile(token, roomId)
+      if (!profile) {
+        return { ...error('Unauthorized: Invalid guest token', 401), headers }
+      }
+      guestId = profile.guestId
+    }
+
+    const result = await performDelete(roomId, songId, guestId)
     if (!result.ok) {
       return { ...error(result.error ?? 'Failed to delete song', 403), headers }
     }

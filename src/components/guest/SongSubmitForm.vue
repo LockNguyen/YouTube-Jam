@@ -5,6 +5,7 @@ import { useSongValidation } from '@/composables/useSongValidation'
 import { submitSong } from '@/services/queue.api'
 import { extractVideoId } from '@/utils/youtubeUrl'
 import { useGuestProfileStore } from '@/stores/guestProfile.store'
+import { fetchVideoInfo } from '@/services/youtube'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 
@@ -38,11 +39,21 @@ async function handleSubmit() {
 
   isSubmitting.value = true
   try {
+    const videoId = extractVideoId(url.value)
+    let info = null
+    if (videoId) {
+      info = await fetchVideoInfo(videoId)
+    }
+
     const res = await submitSong({
       youtubeUrl: url.value,
       guestId: profileStore.profile.guestId,
       name: profileStore.profile.name,
       color: profileStore.profile.color,
+      roomId: store.roomId ?? 'default',
+      token: profileStore.profile.token ?? '',
+      title: info?.title ?? 'Unknown Song',
+      thumbnailUrl: info?.thumbnailUrl ?? null,
     })
     
     if (res.ok) {

@@ -6,6 +6,7 @@ import type { Song, QueueState } from '@/types/song'
 
 export const useQueueStore = defineStore('queue', () => {
   // ─── State ──────────────────────────────────────────────────────────────────
+  const roomId = ref<string | null>(null)
   const songs = ref<Song[]>([])
   const currentSongId = ref<string | null>(null)
   const performanceMode = ref<boolean>(false)
@@ -13,13 +14,20 @@ export const useQueueStore = defineStore('queue', () => {
   const error = ref<string | null>(null)
 
   // ─── Firebase refs ───────────────────────────────────────────────────────────
-  const songsDbRef = dbRef(database, 'songs')
-  const stateDbRef = dbRef(database, 'state')
+  let songsDbRef: any = null
+  let stateDbRef: any = null
 
   // ─── Subscription ───────────────────────────────────────────────────────────
-  function subscribe() {
+  function subscribe(id: string) {
+    if (roomId.value && roomId.value !== id) {
+      unsubscribe()
+    }
+    roomId.value = id
     isLoading.value = true
     error.value = null
+
+    songsDbRef = dbRef(database, `rooms/${id}/songs`)
+    stateDbRef = dbRef(database, `rooms/${id}/state`)
 
     // Listen to all songs
     onValue(
@@ -57,8 +65,11 @@ export const useQueueStore = defineStore('queue', () => {
   }
 
   function unsubscribe() {
-    off(songsDbRef)
-    off(stateDbRef)
+    if (songsDbRef) off(songsDbRef)
+    if (stateDbRef) off(stateDbRef)
+    songsDbRef = null
+    stateDbRef = null
+    roomId.value = null
   }
 
   // ─── Computed getters ────────────────────────────────────────────────────────
@@ -91,6 +102,7 @@ export const useQueueStore = defineStore('queue', () => {
 
   return {
     // state
+    roomId,
     songs,
     currentSongId,
     performanceMode,

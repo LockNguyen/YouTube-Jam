@@ -18,17 +18,7 @@ export function getLocalProfile(): GuestProfile | null {
   }
 }
 
-export function saveLocalProfile(name: string, color: string): GuestProfile {
-  const existing = getLocalProfile()
-  // Ensure the user keeps the same guestId across browser sessions
-  const guestId = existing?.guestId || crypto.randomUUID()
-  
-  const profile: GuestProfile = { 
-    guestId, 
-    name: name.trim(), 
-    color 
-  }
-  
+export function saveLocalProfile(profile: GuestProfile): GuestProfile {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(profile))
   return profile
 }

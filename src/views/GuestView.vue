@@ -10,11 +10,15 @@ import GuestProfileGate from '@/components/guest/GuestProfileGate.vue'
 import GuestProfileMenu from '@/components/common/GuestProfileMenu.vue'
 import { useGuestProfileStore } from '@/stores/guestProfile.store'
 
+const props = defineProps<{
+  roomId: string
+}>()
+
 const store = useQueueStore()
 const profileStore = useGuestProfileStore()
 
 onMounted(() => {
-  store.subscribe()
+  store.subscribe(props.roomId)
 })
 
 onUnmounted(() => {
@@ -34,6 +38,15 @@ onUnmounted(() => {
       <LoadingState v-if="store.isLoading" message="Connecting to queue…" />
 
       <template v-else>
+        <!-- Database Connection Error Banner -->
+        <div v-if="store.error" class="rounded-[var(--radius)] border border-red-500/30 bg-red-500/10 p-4 text-center">
+          <p class="text-sm font-semibold text-red-400">Database Connection Error</p>
+          <p class="mt-1 text-xs text-red-400/80">{{ store.error }}</p>
+          <p class="mt-2 text-[10px] text-zinc-400">
+            Please verify that your Firebase Database Security Rules permit read access to the "/rooms" path.
+          </p>
+        </div>
+
         <NowPlayingCard />
         <SongSubmitForm />
         <UpcomingQueue />

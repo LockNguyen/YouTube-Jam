@@ -20,6 +20,7 @@ export interface GuestProfile {
   guestId: string
   name: string
   color: string
+  token?: string
 }
 
 export interface QueueState {

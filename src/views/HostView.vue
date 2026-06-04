@@ -6,6 +6,10 @@ import HostPlayer from '@/components/host/HostPlayer.vue'
 import HostControls from '@/components/host/HostControls.vue'
 import HostQueueOverlay from '@/components/host/HostQueueOverlay.vue'
 
+const props = defineProps<{
+  roomId: string
+}>()
+
 const store = useQueueStore()
 const { isAuthorized } = useHostActions()
 
@@ -26,7 +30,7 @@ function handleMouseMove() {
 }
 
 onMounted(() => {
-  store.subscribe()
+  store.subscribe(props.roomId)
   window.addEventListener('mousemove', handleMouseMove)
   handleMouseMove()
 })
@@ -77,6 +81,18 @@ function toggleQueue() {
     class="relative flex h-dvh w-full flex-col overflow-hidden bg-black transition-cursor duration-500"
     :class="{ 'cursor-none': !isControlsVisible }"
   >
+    <!-- Database Connection Error Banner -->
+    <div
+      v-if="store.error"
+      class="absolute top-4 left-4 z-50 rounded-lg border border-red-500/30 bg-black/90 p-4 shadow-xl max-w-sm backdrop-blur-md"
+    >
+      <p class="text-sm font-semibold text-red-400">Database Connection Error</p>
+      <p class="mt-1 text-xs text-red-400/80">{{ store.error }}</p>
+      <p class="mt-2 text-[10px] text-zinc-500">
+        Please verify that your Firebase Database Security Rules permit read access to the "/rooms" path.
+      </p>
+    </div>
+
     <!-- Full-screen player -->
     <div class="absolute inset-0">
       <HostPlayer ref="playerRef" />

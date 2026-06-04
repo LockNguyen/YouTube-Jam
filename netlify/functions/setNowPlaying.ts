@@ -1,6 +1,6 @@
 import type { Handler } from '@netlify/functions'
 import { performSetNowPlaying } from '../shared/queueService'
-import { validateHostKey, parseBody } from '../shared/validation'
+import { validateHostKey, parseBody, requireString } from '../shared/validation'
 import { success, error, headers } from '../shared/responses'
 
 const handler: Handler = async (event) => {
@@ -17,12 +17,15 @@ const handler: Handler = async (event) => {
   }
 
   const body = parseBody(event.body)
-
-  // songId can be null (to clear current song)
   const songId = typeof body['songId'] === 'string' ? body['songId'] : null
+  const roomId = requireString(body, 'roomId')
+
+  if (!roomId) {
+    return { ...error('roomId is required'), headers }
+  }
 
   try {
-    await performSetNowPlaying(songId)
+    await performSetNowPlaying(roomId, songId)
     return { ...success({ songId }), headers }
   } catch (err) {
     console.error('[setNowPlaying] Error:', err)

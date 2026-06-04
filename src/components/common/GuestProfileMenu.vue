@@ -31,17 +31,47 @@ const takenColors = computed(() => {
   return taken
 })
 
-function updateColor(color: string) {
+import { registerGuest } from '@/services/queue.api'
+
+async function updateColor(color: string) {
   if (takenColors.value.has(color)) return
   if (!editName.value.trim()) return
-  profileStore.updateProfile(editName.value.trim(), color)
+  try {
+    const res = await registerGuest({
+      name: editName.value.trim(),
+      color,
+      roomId: queueStore.roomId ?? 'default',
+      guestId: profileStore.profile?.guestId,
+    })
+    if (res.ok && res.data) {
+      profileStore.updateProfile(res.data)
+    } else {
+      alert(res.error ?? 'Failed to update profile.')
+    }
+  } catch {
+    alert('Network error. Please try again.')
+  }
 }
 
-function updateName() {
+async function updateName() {
   if (!editName.value.trim()) return
   if (!profileStore.profile?.color) return
-  profileStore.updateProfile(editName.value.trim(), profileStore.profile.color)
-  closeMenu()
+  try {
+    const res = await registerGuest({
+      name: editName.value.trim(),
+      color: profileStore.profile.color,
+      roomId: queueStore.roomId ?? 'default',
+      guestId: profileStore.profile.guestId,
+    })
+    if (res.ok && res.data) {
+      profileStore.updateProfile(res.data)
+      closeMenu()
+    } else {
+      alert(res.error ?? 'Failed to update profile.')
+    }
+  } catch {
+    alert('Network error. Please try again.')
+  }
 }
 </script>
 

@@ -1,6 +1,6 @@
 import type { Handler } from '@netlify/functions'
 import { performSkip } from '../shared/queueService'
-import { validateHostKey } from '../shared/validation'
+import { validateHostKey, parseBody, requireString } from '../shared/validation'
 import { success, error, headers } from '../shared/responses'
 
 const handler: Handler = async (event) => {
@@ -16,8 +16,15 @@ const handler: Handler = async (event) => {
     return { ...error('Unauthorized', 401), headers }
   }
 
+  const body = parseBody(event.body)
+  const roomId = requireString(body, 'roomId')
+
+  if (!roomId) {
+    return { ...error('roomId is required'), headers }
+  }
+
   try {
-    const result = await performSkip()
+    const result = await performSkip(roomId)
     return { ...success(result), headers }
   } catch (err) {
     console.error('[skipSong] Error:', err)

@@ -10,12 +10,14 @@ export const useGuestProfileStore = defineStore('guestProfile', () => {
     return (
       profile.value !== null &&
       profile.value.name.trim().length > 0 &&
-      profile.value.color.trim().length > 0
+      profile.value.color.trim().length > 0 &&
+      profile.value.token !== undefined &&
+      profile.value.token.length > 0
     )
   })
 
-  function updateProfile(name: string, color: string) {
-    profile.value = saveLocalProfile(name, color)
+  function updateProfile(newProfile: GuestProfile) {
+    profile.value = saveLocalProfile(newProfile)
   }
 
   return {

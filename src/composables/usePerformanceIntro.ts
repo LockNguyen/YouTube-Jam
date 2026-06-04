@@ -27,7 +27,7 @@ export function usePerformanceIntro(player: {
     currentSongId: null,
   })
 
-  const originalVolume = 100
+  let originalVolume = 100
   let timeouts: number[] = []
 
   function clearTimeouts() {
@@ -35,26 +35,33 @@ export function usePerformanceIntro(player: {
     timeouts = []
   }
 
-  function skipIntro() {
-    if (!state.value.isRunning) return
+  function stopIntro() {
     clearTimeouts()
-
-    // Restore volume and play from start
-    player.setVolume(originalVolume)
-    player.seekTo(0)
-    player.play()
-
-    state.value.isRunning = false
+    if (state.value.isRunning) {
+      player.setVolume(originalVolume)
+      state.value.isRunning = false
+    }
     state.value.isTitleVisible = false
     state.value.isArtistVisible = false
     state.value.isDimmed = false
     state.value.isZoomed = false
+    state.value.currentSongId = null
+  }
+
+  function skipIntro() {
+    if (!state.value.isRunning) return
+    stopIntro()
+    player.seekTo(0)
+    player.play()
   }
 
   function startIntro(songId: string) {
     clearTimeouts()
 
-    // Start out with the video zoomed in and muted
+    // Store current volume level to restore it later
+    originalVolume = player.getVolume()
+
+    // Start video zoomed and muted
     player.setVolume(0)
 
     state.value = {
@@ -66,12 +73,11 @@ export function usePerformanceIntro(player: {
       currentSongId: songId,
     }
 
-    // Wait a brief moment for the video to load before grabbing duration/volume
-    // The player should already be loading it via HostPlayer.vue
+    // Wait for the video iframe to buffer/start before seeking
     timeouts.push(window.setTimeout(() => {
       if (!state.value.isRunning) return
 
-      player.setVolume(100)
+      player.setVolume(originalVolume)
       const duration = player.getDuration()
 
       if (duration > 0) {
@@ -79,91 +85,74 @@ export function usePerformanceIntro(player: {
       }
       player.play()
 
-      // 5.0s: Fade in dark overlay, lower volume
+      // 5.0s mark: Zoom out video, apply dimming overlay
       timeouts.push(window.setTimeout(() => {
+        if (!state.value.isRunning) return
         state.value.isDimmed = true
         state.value.isZoomed = false
         playSwoosh()
 
-        // 5.2s: Reveal title
+        // 5.5s mark: Fade in title
         timeouts.push(window.setTimeout(() => {
+          if (!state.value.isRunning) return
           state.value.isTitleVisible = true
         }, 500))
 
-        // 5.2s: Swoosh
+        // Title swoosh effect
         timeouts.push(window.setTimeout(() => {
+          if (!state.value.isRunning) return
           playSwoosh()
         }, 550))
 
-        // 6.2s: Reveal name
+        // 9.3s mark: Switch title to performer name
         timeouts.push(window.setTimeout(() => {
+          if (!state.value.isRunning) return
           state.value.isTitleVisible = false
           state.value.isArtistVisible = true
         }, 3800))
 
-        // 6.2s: Swoosh
+        // Performer swoosh effect
         timeouts.push(window.setTimeout(() => {
+          if (!state.value.isRunning) return
           playSwoosh()
         }, 3850))
 
-        // 6.2s: Hide name
+        // 11.3s mark: Hide performer name
         timeouts.push(window.setTimeout(() => {
+          if (!state.value.isRunning) return
           state.value.isArtistVisible = false
         }, 5800))
 
-        // 5.2s: Swoosh
+        // Outro swoosh effect
         timeouts.push(window.setTimeout(() => {
+          if (!state.value.isRunning) return
           playSwoosh()
         }, 5850))
 
-        // 6.2s: Undim the screen
+        // 10.5s mark: Undim screen
         timeouts.push(window.setTimeout(() => {
+          if (!state.value.isRunning) return
           state.value.isDimmed = false
         }, 5000))
 
-        // 6.2s: Music fade out
-        timeouts.push(window.setTimeout(() => {
-          player.setVolume(80)
-        }, 5300))
+        // Audio fade calculations proportional to starting volume
+        const fade = (ratio: number) => {
+          if (!state.value.isRunning) return
+          player.setVolume(Math.floor(originalVolume * ratio))
+        }
 
-        // 6.2s: Music fade out
-        timeouts.push(window.setTimeout(() => {
-          player.setVolume(50)
-        }, 5400))
+        timeouts.push(window.setTimeout(() => fade(0.80), 5300))
+        timeouts.push(window.setTimeout(() => fade(0.50), 5400))
+        timeouts.push(window.setTimeout(() => fade(0.30), 5500))
+        timeouts.push(window.setTimeout(() => fade(0.20), 5600))
+        timeouts.push(window.setTimeout(() => fade(0.15), 5700))
+        timeouts.push(window.setTimeout(() => fade(0.10), 5800))
+        timeouts.push(window.setTimeout(() => fade(0.05), 5900))
+        timeouts.push(window.setTimeout(() => fade(0.00), 6000))
 
-        // 6.2s: Music fade out
-        timeouts.push(window.setTimeout(() => {
-          player.setVolume(30)
-        }, 5500))
+      }, 1000))
 
-        // 6.2s: Music fade out
-        timeouts.push(window.setTimeout(() => {
-          player.setVolume(20)
-        }, 5600))
-
-        // 6.2s: Music fade out
-        timeouts.push(window.setTimeout(() => {
-          player.setVolume(15)
-        }, 5700))
-
-        // 6.2s: Music fade out
-        timeouts.push(window.setTimeout(() => {
-          player.setVolume(10)
-        }, 5800))
-
-        // 6.2s: Music fade out
-        timeouts.push(window.setTimeout(() => {
-          player.setVolume(5)
-        }, 5900))
-
-        // 6.2s: Music fade out
-        timeouts.push(window.setTimeout(() => {
-          player.setVolume(0)
-        }, 6000))
-
-      }, 1000)) // 0.5s initial + 4.5s = 5.0s total
-
-      // 10.0s: End intro, start song
+      // 12.0s mark: Exit intro and start song
       timeouts.push(window.setTimeout(() => {
         skipIntro()
       }, 6500))
@@ -175,6 +164,7 @@ export function usePerformanceIntro(player: {
     introState: state,
     startIntro,
     skipIntro,
+    stopIntro,
     clearTimeouts,
   }
 }

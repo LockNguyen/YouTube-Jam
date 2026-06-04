@@ -26,11 +26,28 @@ const isFormValid = computed(() => {
   return name.value.trim().length > 0 && selectedColor.value !== ''
 })
 
-function handleSubmit() {
+import { registerGuest } from '@/services/queue.api'
+
+async function handleSubmit() {
   if (!isFormValid.value) return
   isSubmitting.value = true
-  profileStore.updateProfile(name.value.trim(), selectedColor.value)
-  isSubmitting.value = false
+  try {
+    const res = await registerGuest({
+      name: name.value.trim(),
+      color: selectedColor.value,
+      roomId: queueStore.roomId ?? 'default',
+      guestId: profileStore.profile?.guestId,
+    })
+    if (res.ok && res.data) {
+      profileStore.updateProfile(res.data)
+    } else {
+      alert(res.error ?? 'Failed to join party.')
+    }
+  } catch {
+    alert('Network error. Please try again.')
+  } finally {
+    isSubmitting.value = false
+  }
 }
 </script>
 

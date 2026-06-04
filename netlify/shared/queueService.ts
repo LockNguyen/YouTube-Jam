@@ -7,21 +7,19 @@ function now(): number {
   return Date.now()
 }
 
-async function getAllSongs(): Promise<Song[]> {
-  const snap = await adminDb.ref('songs').once('value')
+async function getAllSongs(roomId: string): Promise<Song[]> {
+  const snap = await adminDb.ref(`rooms/${roomId}/songs`).once('value')
   if (!snap.exists()) return []
   const raw = snap.val() as Record<string, Omit<Song, 'id'>>
-  return Object.entries(raw).map(([id, data]) => ({ id, ...data }))
-}
-
-async function getState(): Promise<QueueState | null> {
-  const snap = await adminDb.ref('state').once('value')
-  return snap.exists() ? (snap.val() as QueueState) : null
+  return Object.entries(raw)
+    .map(([id, data]) => ({ id, ...data }))
+    .filter((s) => typeof s.order === 'number' && !isNaN(s.order) && s.videoId)
 }
 
 // ─── Queue service ────────────────────────────────────────────────────────────
 
 export async function addSong(
+  roomId: string,
   videoId: string,
   title: string | null,
   thumbnailUrl: string | null,
@@ -29,19 +27,16 @@ export async function addSong(
   name: string,
   color: string,
 ): Promise<string> {
-  const songs = await getAllSongs()
-  const queued = songs.filter((s) => s.status === 'queued' || s.status === 'playing')
-  const maxOrder = queued.length > 0 ? Math.max(...queued.map((s) => s.order)) : 0
-
-  const newRef = adminDb.ref('songs').push()
-  const id = newRef.key!
+  const songsRef = adminDb.ref(`rooms/${roomId}/songs`)
+  const newSongRef = songsRef.push()
+  const id = newSongRef.key!
 
   const song: Omit<Song, 'id'> = {
     videoId,
     title,
     thumbnailUrl,
     status: 'queued',
-    order: maxOrder + 1000,
+    order: 0, // set dynamically inside transaction
     submittedAt: now(),
     submittedByGuestId: guestId,
     submittedByName: name,
@@ -51,173 +46,294 @@ export async function addSong(
     deletedAt: null,
   }
 
-  await newRef.set(song)
+  await songsRef.transaction((currentSongs) => {
+    const raw = currentSongs || {}
+    const songsList = Object.entries(raw).map(([songId, data]) => ({ id: songId, ...(data as any) }))
+    const active = songsList.filter((s) => s.status === 'queued' || s.status === 'playing')
+    const orders = active.map((s) => Number(s.order)).filter((o) => !isNaN(o))
+    const maxOrder = orders.length > 0 ? Math.max(...orders) : 0
+
+    song.order = maxOrder + 1000
+    raw[id] = song
+    return raw
+  })
+
   return id
 }
 
-export async function getNextQueuedSong(excludeId?: string): Promise<Song | null> {
-  const songs = await getAllSongs()
-  const queued = songs
-    .filter((s) => s.status === 'queued' && s.id !== excludeId)
-    .sort((a, b) => a.order - b.order)
-  return queued[0] ?? null
-}
+export async function performSkip(roomId: string): Promise<{ nextSongId: string | null }> {
+  const roomRef = adminDb.ref(`rooms/${roomId}`)
+  let nextId: string | null = null
 
-export async function getPreviousSong(): Promise<Song | null> {
-  const songs = await getAllSongs()
-  const history = songs
-    .filter((s) => s.status === 'played' || s.status === 'skipped')
-    .sort((a, b) => (b.endedAt ?? 0) - (a.endedAt ?? 0))
-  return history[0] ?? null
-}
+  await roomRef.transaction((currentRoom) => {
+    if (!currentRoom) return {}
 
-export async function markSongAs(
-  songId: string,
-  status: SongStatus,
-  extra: Partial<Song> = {},
-): Promise<void> {
-  const updates: Partial<Song> = { status, ...extra }
-  await adminDb.ref(`songs/${songId}`).update(updates)
-}
+    const songsRaw = currentRoom.songs || {}
+    const stateRaw = currentRoom.state || {}
+    const currentId = stateRaw.currentSongId
 
-export async function setCurrentSong(songId: string | null): Promise<void> {
-  await adminDb.ref('state').update({
-    currentSongId: songId,
-    updatedAt: now(),
+    // 1. Skip current song
+    if (currentId && songsRaw[currentId]) {
+      songsRaw[currentId].status = 'skipped'
+      songsRaw[currentId].endedAt = now()
+    }
+
+    // 2. Find next queued song
+    const songsList = Object.entries(songsRaw).map(([id, data]) => ({ id, ...(data as any) }))
+    const queued = songsList
+      .filter((s) => s.status === 'queued')
+      .sort((a, b) => Number(a.order || 0) - Number(b.order || 0))
+    
+    const next = queued[0] ?? null
+    nextId = next?.id ?? null
+
+    // 3. Set next song playing
+    if (nextId && songsRaw[nextId]) {
+      songsRaw[nextId].status = 'playing'
+      songsRaw[nextId].startedAt = now()
+    }
+
+    // 4. Update state
+    stateRaw.currentSongId = nextId
+    stateRaw.updatedAt = now()
+
+    currentRoom.songs = songsRaw
+    currentRoom.state = stateRaw
+    return currentRoom
   })
-}
 
-export async function performSkip(): Promise<{ nextSongId: string | null }> {
-  const state = await getState()
-  const currentId = state?.currentSongId
-
-  if (currentId) {
-    await markSongAs(currentId, 'skipped', { endedAt: now() })
-  }
-
-  const next = await getNextQueuedSong()
-  const nextId = next?.id ?? null
-
-  if (nextId) {
-    await markSongAs(nextId, 'playing', { startedAt: now() })
-  }
-
-  await setCurrentSong(nextId)
   return { nextSongId: nextId }
 }
 
-export async function performPrevious(): Promise<{ previousSongId: string | null }> {
-  const state = await getState()
-  const currentId = state?.currentSongId
+export async function performPrevious(roomId: string): Promise<{ previousSongId: string | null }> {
+  const roomRef = adminDb.ref(`rooms/${roomId}`)
+  let prevId: string | null = null
 
-  const previous = await getPreviousSong()
-  if (!previous) return { previousSongId: null }
+  await roomRef.transaction((currentRoom) => {
+    if (!currentRoom) return {}
 
-  if (currentId) {
-    const songs = await getAllSongs()
-    const queued = songs.filter((s) => s.status === 'queued')
-    const minOrder = queued.length > 0 ? Math.min(...queued.map((s) => s.order)) : 1000
-    await markSongAs(currentId, 'queued', {
-      startedAt: null,
-      endedAt: null,
-      order: minOrder - 1000,
-    })
-  }
+    const songsRaw = currentRoom.songs || {}
+    const stateRaw = currentRoom.state || {}
+    const currentId = stateRaw.currentSongId
 
-  await markSongAs(previous.id, 'playing', { startedAt: now(), endedAt: null })
-  await setCurrentSong(previous.id)
+    const songsList = Object.entries(songsRaw).map(([id, data]) => ({ id, ...(data as any) }))
+    const history = songsList
+      .filter((s) => s.status === 'played' || s.status === 'skipped')
+      .sort((a, b) => Number(b.endedAt || 0) - Number(a.endedAt || 0))
+    
+    const previous = history[0] ?? null
+    if (!previous) return // Abort: no previous history
 
-  return { previousSongId: previous.id }
+    prevId = previous.id
+
+    // Put current song back in queue at the front
+    if (currentId && songsRaw[currentId]) {
+      const queued = songsList.filter((s) => s.status === 'queued')
+      const orders = queued.map((s) => Number(s.order)).filter((o) => !isNaN(o))
+      const minOrder = orders.length > 0 ? Math.min(...orders) : 1000
+      
+      songsRaw[currentId].status = 'queued'
+      songsRaw[currentId].startedAt = null
+      songsRaw[currentId].endedAt = null
+      songsRaw[currentId].order = minOrder - 1000
+    }
+
+    // Set previous song as playing
+    songsRaw[previous.id].status = 'playing'
+    songsRaw[previous.id].startedAt = now()
+    songsRaw[previous.id].endedAt = null
+
+    stateRaw.currentSongId = previous.id
+    stateRaw.updatedAt = now()
+
+    currentRoom.songs = songsRaw
+    currentRoom.state = stateRaw
+    return currentRoom
+  })
+
+  return { previousSongId: prevId }
 }
 
-export async function performDelete(songId: string, guestId?: string): Promise<{ ok: boolean; error?: string }> {
-  const songs = await getAllSongs()
-  const song = songs.find((s) => s.id === songId)
-  
-  if (!song) return { ok: false, error: 'Song not found' }
+export async function performDelete(
+  roomId: string,
+  songId: string,
+  guestId?: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const roomRef = adminDb.ref(`rooms/${roomId}`)
+  let result = { ok: true, error: '' }
 
-  // Guest permission check
-  if (guestId) {
-    if (song.submittedByGuestId !== guestId) {
-      return { ok: false, error: 'Cannot delete someone else’s song' }
+  await roomRef.transaction((currentRoom) => {
+    if (!currentRoom) return {}
+
+    const songsRaw = currentRoom.songs || {}
+    const stateRaw = currentRoom.state || {}
+    const song = songsRaw[songId]
+
+    if (!song) {
+      result = { ok: false, error: 'Song not found' }
+      return
     }
-    if (song.status !== 'queued') {
-      return { ok: false, error: 'Guests can only delete queued songs' }
+
+    // Guest ownership checks
+    if (guestId) {
+      if (song.submittedByGuestId !== guestId) {
+        result = { ok: false, error: 'Cannot delete someone else’s song' }
+        return
+      }
+      if (song.status !== 'queued') {
+        result = { ok: false, error: 'Guests can only delete queued songs' }
+        return
+      }
     }
-  }
 
-  const state = await getState()
-  const isCurrentSong = state?.currentSongId === songId
+    const isCurrentSong = stateRaw.currentSongId === songId
 
-  await markSongAs(songId, 'deleted', { deletedAt: now() })
+    song.status = 'deleted'
+    song.deletedAt = now()
 
-  if (isCurrentSong) {
-    const next = await getNextQueuedSong(songId)
-    if (next) {
-      await markSongAs(next.id, 'playing', { startedAt: now() })
+    if (isCurrentSong) {
+      const songsList = Object.entries(songsRaw).map(([id, data]) => ({ id, ...(data as any) }))
+      const queued = songsList
+        .filter((s) => s.status === 'queued' && s.id !== songId)
+        .sort((a, b) => Number(a.order || 0) - Number(b.order || 0))
+      
+      const next = queued[0] ?? null
+      
+      if (next) {
+        songsRaw[next.id].status = 'playing'
+        songsRaw[next.id].startedAt = now()
+      }
+      stateRaw.currentSongId = next?.id ?? null
+      stateRaw.updatedAt = now()
     }
-    await setCurrentSong(next?.id ?? null)
-  }
-  
+
+    currentRoom.songs = songsRaw
+    currentRoom.state = stateRaw
+    return currentRoom
+  })
+
+  if (!result.ok) return result
   return { ok: true }
 }
 
-export async function performSetNowPlaying(songId: string | null): Promise<void> {
-  const songs = await getAllSongs()
-  const queued = songs.filter((s) => s.status === 'queued')
-  const next = queued.find((s) => s.id === songId) ?? null
+export async function performSetNowPlaying(roomId: string, songId: string | null): Promise<void> {
+  const roomRef = adminDb.ref(`rooms/${roomId}`)
 
-  await setCurrentSong(next?.id ?? null)
-  if (next) {
-    await markSongAs(next.id, 'playing', { startedAt: now() })
-  }
+  await roomRef.transaction((currentRoom) => {
+    if (!currentRoom) return {}
+
+    const songsRaw = currentRoom.songs || {}
+    const stateRaw = currentRoom.state || {}
+    const currentId = stateRaw.currentSongId
+
+    // Transition previous song to played
+    if (currentId && songsRaw[currentId] && songsRaw[currentId].status === 'playing') {
+      songsRaw[currentId].status = 'played'
+      songsRaw[currentId].endedAt = now()
+    }
+
+    const songsList = Object.entries(songsRaw).map(([id, data]) => ({ id, ...(data as any) }))
+    const queued = songsList.filter((s) => s.status === 'queued')
+    const next = queued.find((s) => s.id === songId) ?? null
+
+    stateRaw.currentSongId = next?.id ?? null
+    stateRaw.updatedAt = now()
+
+    if (next && songsRaw[next.id]) {
+      songsRaw[next.id].status = 'playing'
+      songsRaw[next.id].startedAt = now()
+    }
+
+    currentRoom.songs = songsRaw
+    currentRoom.state = stateRaw
+    return currentRoom
+  })
 }
 
-export async function setPerformanceMode(enabled: boolean): Promise<void> {
-  await adminDb.ref('state').update({
+export async function setPerformanceMode(roomId: string, enabled: boolean): Promise<void> {
+  await adminDb.ref(`rooms/${roomId}/state`).update({
     performanceMode: enabled,
     updatedAt: now(),
   })
 }
 
-export async function performClearQueue(): Promise<void> {
-  const songs = await getAllSongs()
-  const queued = songs.filter((s) => s.status === 'queued')
+export async function performClearQueue(roomId: string): Promise<void> {
+  const songsRef = adminDb.ref(`rooms/${roomId}/songs`)
 
-  for (const song of queued) {
-    await adminDb.ref(`songs/${song.id}`).update({ status: 'deleted', deletedAt: now() })
-  }
+  await songsRef.transaction((currentSongs) => {
+    if (!currentSongs) return {}
+
+    for (const id of Object.keys(currentSongs)) {
+      if (currentSongs[id].status === 'queued') {
+        currentSongs[id].status = 'deleted'
+        currentSongs[id].deletedAt = now()
+      }
+    }
+    return currentSongs
+  })
 }
 
 export async function performReorder(
+  roomId: string,
   songId: string,
   direction: 'up' | 'down' | 'top' | 'bottom',
-): Promise<void> {
-  const songs = await getAllSongs()
-  const queued = songs.filter((s) => s.status === 'queued').sort((a, b) => a.order - b.order)
-  const idx = queued.findIndex((s) => s.id === songId)
-  if (idx === -1) return
+  guestId?: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const roomRef = adminDb.ref(`rooms/${roomId}`)
+  let result = { ok: true, error: '' }
 
-  const curr = queued[idx]
-  if (!curr) return
+  await roomRef.transaction((currentRoom) => {
+    if (!currentRoom) return {}
 
-  if (direction === 'up' && idx > 0) {
-    const prev = queued[idx - 1]
-    if (!prev) return
-    await adminDb.ref(`songs/${curr.id}`).update({ order: prev.order })
-    await adminDb.ref(`songs/${prev.id}`).update({ order: curr.order })
-  } else if (direction === 'down' && idx < queued.length - 1) {
-    const next = queued[idx + 1]
-    if (!next) return
-    await adminDb.ref(`songs/${curr.id}`).update({ order: next.order })
-    await adminDb.ref(`songs/${next.id}`).update({ order: curr.order })
-  } else if (direction === 'top' && idx > 0) {
-    const first = queued[0]
-    if (!first) return
-    await adminDb.ref(`songs/${curr.id}`).update({ order: first.order - 1000 })
-  } else if (direction === 'bottom' && idx < queued.length - 1) {
-    const last = queued[queued.length - 1]
-    if (!last) return
-    await adminDb.ref(`songs/${curr.id}`).update({ order: last.order + 1000 })
-  }
+    const songsRaw = currentRoom.songs || {}
+    const songsList = Object.entries(songsRaw).map(([id, data]) => ({ id, ...(data as any) }))
+    const targetSong = songsRaw[songId]
+
+    if (!targetSong) {
+      result = { ok: false, error: 'Song not found' }
+      return
+    }
+
+    // Guest ownership checks for reordering
+    if (guestId && targetSong.submittedByGuestId !== guestId) {
+      result = { ok: false, error: 'Cannot reorder someone else’s song' }
+      return
+    }
+
+    const queued = songsList
+      .filter((s) => s.status === 'queued')
+      .sort((a, b) => Number(a.order || 0) - Number(b.order || 0))
+
+    const idx = queued.findIndex((s) => s.id === songId)
+    if (idx === -1) {
+      result = { ok: false, error: 'Song is not in the queue' }
+      return
+    }
+
+    const curr = queued[idx]!
+
+    if (direction === 'up' && idx > 0) {
+      const prev = queued[idx - 1]!
+      const temp = curr.order
+      songsRaw[curr.id].order = prev.order
+      songsRaw[prev.id].order = temp
+    } else if (direction === 'down' && idx < queued.length - 1) {
+      const next = queued[idx + 1]!
+      const temp = curr.order
+      songsRaw[curr.id].order = next.order
+      songsRaw[next.id].order = temp
+    } else if (direction === 'top' && idx > 0) {
+      const first = queued[0]!
+      songsRaw[curr.id].order = first.order - 1000
+    } else if (direction === 'bottom' && idx < queued.length - 1) {
+      const last = queued[queued.length - 1]!
+      songsRaw[curr.id].order = last.order + 1000
+    }
+
+    currentRoom.songs = songsRaw
+    return currentRoom
+  })
+
+  if (!result.ok) return result
+  return { ok: true }
 }
