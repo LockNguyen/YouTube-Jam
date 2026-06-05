@@ -27,6 +27,7 @@ interface YTPlayerInstance {
   loadVideoById(videoId: string): void
   getPlayerState(): number
   getDuration(): number
+  getCurrentTime(): number
   setVolume(volume: number): void
   getVolume(): number
   destroy(): void
@@ -99,6 +100,7 @@ function loadYouTubeApi(): Promise<void> {
 export interface UseYouTubePlayerOptions {
   onEnded?: () => void
   onError?: (event: YTPlayerEvent) => void
+  onStateChange?: (event: YTPlayerEvent) => void
 }
 
 export function useYouTubePlayer(options: UseYouTubePlayerOptions = {}) {
@@ -133,6 +135,8 @@ export function useYouTubePlayer(options: UseYouTubePlayerOptions = {}) {
           playerState.value = event.data
           isPlaying.value = event.data === PlayerState.PLAYING
 
+          options.onStateChange?.(event)
+
           if (event.data === PlayerState.ENDED) {
             options.onEnded?.()
           }
@@ -166,8 +170,12 @@ export function useYouTubePlayer(options: UseYouTubePlayerOptions = {}) {
     return player?.getPlayerState() ?? -1
   }
 
-  function getDuration(): number {
+   function getDuration(): number {
     return player?.getDuration() ?? 0
+  }
+
+  function getCurrentTime(): number {
+    return player?.getCurrentTime() ?? 0
   }
 
   function seekTo(seconds: number) {
@@ -205,6 +213,7 @@ export function useYouTubePlayer(options: UseYouTubePlayerOptions = {}) {
     restart,
     getState,
     getDuration,
+    getCurrentTime,
     seekTo,
     getVolume,
     setVolume,

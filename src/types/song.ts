@@ -14,6 +14,7 @@ export interface Song {
   startedAt: number | null
   endedAt: number | null
   deletedAt: number | null
+  isNonEmbeddable?: boolean
 }
 
 export interface GuestProfile {

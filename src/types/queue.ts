@@ -9,7 +9,9 @@ export interface SubmitSongPayload {
   color: string
   title?: string | null
   thumbnailUrl?: string | null
+  isNonEmbeddable?: boolean
 }
+
 
 export interface ReorderPayload {
   songId: string

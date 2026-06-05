@@ -27,11 +27,15 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<{
   delete: [songId: string]
   reorder: [songId: string, direction: ReorderDirection]
+  jump: [songId: string]
 }>()
 </script>
 
 <template>
-  <div class="flex items-center gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-white/5">
+  <div
+    class="flex items-center gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-white/5 cursor-pointer"
+    @click="emit('jump', song.id)"
+  >
     <!-- Position -->
     <span class="w-5 flex-shrink-0 text-center text-xs font-medium text-[hsl(var(--foreground-subtle))]">
       {{ position }}
@@ -69,41 +73,40 @@ const emit = defineEmits<{
     </div>
 
     <!-- Reorder buttons -->
-    <div v-if="showReorder || showDelete" class="flex flex-shrink-0 items-center gap-0.5">
+    <div v-if="showReorder || showDelete" class="flex flex-shrink-0 items-center gap-0.5" @click.stop>
       <template v-if="showReorder">
-      <Button
-        variant="ghost"
-        size="icon"
-        class="h-7 w-7 text-xs"
-        title="Move to top"
-        :disabled="props.isFirst || isDeleting"
-        @click="emit('reorder', song.id, 'top')"
-      >⤒</Button>
-      <Button
-        variant="ghost"
-        size="icon"
-        class="h-7 w-7 text-xs"
-        title="Move up"
-        :disabled="props.isFirst || isDeleting"
-        @click="emit('reorder', song.id, 'up')"
-      >↑</Button>
-      <Button
-        variant="ghost"
-        size="icon"
-        class="h-7 w-7 text-xs"
-        title="Move down"
-        :disabled="props.isLast || isDeleting"
-        @click="emit('reorder', song.id, 'down')"
-      >↓</Button>
-      <Button
-        variant="ghost"
-        size="icon"
-        class="h-7 w-7 text-xs"
-        title="Move to bottom"
-        :disabled="props.isLast || isDeleting"
-        @click="emit('reorder', song.id, 'bottom')"
-      >⤓</Button>
-
+        <Button
+          variant="ghost"
+          size="icon"
+          class="h-7 w-7 text-xs"
+          title="Move to top"
+          :disabled="props.isFirst || isDeleting"
+          @click="emit('reorder', song.id, 'top')"
+        >⤒</Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          class="h-7 w-7 text-xs"
+          title="Move up"
+          :disabled="props.isFirst || isDeleting"
+          @click="emit('reorder', song.id, 'up')"
+        >↑</Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          class="h-7 w-7 text-xs"
+          title="Move down"
+          :disabled="props.isLast || isDeleting"
+          @click="emit('reorder', song.id, 'down')"
+        >↓</Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          class="h-7 w-7 text-xs"
+          title="Move to bottom"
+          :disabled="props.isLast || isDeleting"
+          @click="emit('reorder', song.id, 'bottom')"
+        >⤓</Button>
       </template>
 
       <!-- Delete -->

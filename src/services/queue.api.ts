@@ -104,3 +104,35 @@ export async function setNowPlaying(hostKey: string, songId: string | null, room
 export async function setPerformanceMode(hostKey: string, enabled: boolean, roomId: string): Promise<ApiResponse> {
   return post('setPerformanceMode', { enabled, roomId }, hostKey)
 }
+
+export async function searchAlternatives(videoId: string): Promise<ApiResponse<{ alternatives: Array<{ videoId: string; title: string; thumbnailUrl: string }> }>> {
+  return post('searchAlternatives', { videoId })
+}
+
+export async function jumpToSong(hostKey: string, songId: string, roomId: string): Promise<ApiResponse> {
+  return post('jumpToSong', { songId, roomId }, hostKey)
+}
+
+export async function searchSongs(
+  query: string,
+  page?: number,
+  pageToken?: string,
+): Promise<ApiResponse<{
+  results: Array<{ videoId: string; title: string; thumbnailUrl: string; embeddable: boolean }>
+  nextPage?: number
+  nextPageToken?: string
+}>> {
+  return post('searchSongs', { query, page, pageToken })
+}
+
+export async function suggestSongs(
+  roomId: string,
+  page?: number,
+  pageToken?: string,
+): Promise<ApiResponse<{
+  results: Array<{ videoId: string; title: string; thumbnailUrl: string; embeddable: boolean }>
+  nextPage?: number
+  nextPageToken?: string
+}>> {
+  return post('suggestSongs', { roomId, page, pageToken })
+}

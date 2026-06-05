@@ -54,5 +54,6 @@ export function useHostActions() {
       run((k) => queueApi.reorderQueue(k, songId, direction, roomId.value)),
     setNowPlaying: (songId: string | null) => run((k) => queueApi.setNowPlaying(k, songId, roomId.value)),
     setPerformanceMode: (enabled: boolean) => run((k) => queueApi.setPerformanceMode(k, enabled, roomId.value)),
+    jumpToSong: (songId: string) => run((k) => queueApi.jumpToSong(k, songId, roomId.value)),
   }
 }

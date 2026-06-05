@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import { playSwoosh } from '@/services/soundEffects'
+import { useQueueStore } from '@/stores/queue.store'
 
 export type PerformanceIntroState = {
   isRunning: boolean
@@ -29,6 +30,7 @@ export function usePerformanceIntro(player: {
 
   let originalVolume = 100
   let timeouts: number[] = []
+  const songStartOffset = ref(0)
 
   function clearTimeouts() {
     timeouts.forEach(clearTimeout)
@@ -38,7 +40,10 @@ export function usePerformanceIntro(player: {
   function stopIntro() {
     clearTimeouts()
     if (state.value.isRunning) {
-      player.setVolume(originalVolume)
+      const store = useQueueStore()
+      if (!store.currentSong?.isNonEmbeddable) {
+        player.setVolume(originalVolume)
+      }
       state.value.isRunning = false
     }
     state.value.isTitleVisible = false
@@ -48,21 +53,32 @@ export function usePerformanceIntro(player: {
     state.value.currentSongId = null
   }
 
-  function skipIntro() {
+  function skipIntro(seekTime = songStartOffset.value) {
     if (!state.value.isRunning) return
     stopIntro()
-    player.seekTo(0)
+
+    const store = useQueueStore()
+    if (store.currentSong?.isNonEmbeddable) {
+      return
+    }
+
+    player.seekTo(seekTime)
     player.play()
   }
 
-  function startIntro(songId: string) {
+  function startIntro(songId: string, startOffset = 0) {
     clearTimeouts()
+    songStartOffset.value = startOffset
 
-    // Store current volume level to restore it later
-    originalVolume = player.getVolume()
+    const store = useQueueStore()
+    const isNonEmbeddable = store.currentSong?.isNonEmbeddable
 
-    // Start video zoomed and muted
-    player.setVolume(0)
+    if (!isNonEmbeddable) {
+      // Store current volume level to restore it later
+      originalVolume = player.getVolume()
+      // Start video zoomed and muted
+      player.setVolume(0)
+    }
 
     state.value = {
       isRunning: true,
@@ -77,13 +93,15 @@ export function usePerformanceIntro(player: {
     timeouts.push(window.setTimeout(() => {
       if (!state.value.isRunning) return
 
-      player.setVolume(originalVolume)
-      const duration = player.getDuration()
+      if (!isNonEmbeddable) {
+        player.setVolume(originalVolume)
+        const duration = player.getDuration()
 
-      if (duration > 0) {
-        player.seekTo(Math.max(0, duration * 0.75))
+        if (duration > 0) {
+          player.seekTo(Math.max(0, duration * 0.75))
+        }
+        player.play()
       }
-      player.play()
 
       // 5.0s mark: Zoom out video, apply dimming overlay
       timeouts.push(window.setTimeout(() => {
@@ -138,7 +156,9 @@ export function usePerformanceIntro(player: {
         // Audio fade calculations proportional to starting volume
         const fade = (ratio: number) => {
           if (!state.value.isRunning) return
-          player.setVolume(Math.floor(originalVolume * ratio))
+          if (!isNonEmbeddable) {
+            player.setVolume(Math.floor(originalVolume * ratio))
+          }
         }
 
         timeouts.push(window.setTimeout(() => fade(0.80), 5300))
@@ -154,7 +174,7 @@ export function usePerformanceIntro(player: {
 
       // 12.0s mark: Exit intro and start song
       timeouts.push(window.setTimeout(() => {
-        skipIntro()
+        skipIntro(songStartOffset.value)
       }, 6500))
 
     }, 1000))
@@ -162,6 +182,7 @@ export function usePerformanceIntro(player: {
 
   return {
     introState: state,
+    songStartOffset,
     startIntro,
     skipIntro,
     stopIntro,

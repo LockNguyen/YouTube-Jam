@@ -13,10 +13,11 @@ import Separator from '@/components/ui/Separator.vue'
 defineEmits<{ close: [] }>()
 
 const store = useQueueStore()
-const { deleteSong, reorderSong } = useHostActions()
+const { deleteSong, reorderSong, jumpToSong } = useHostActions()
 
 const deletingIds = ref<Set<string>>(new Set())
 const reorderingIds = ref<Set<string>>(new Set())
+const jumpingIds = ref<Set<string>>(new Set())
 
 async function handleDelete(songId: string) {
   deletingIds.value.add(songId)
@@ -28,6 +29,12 @@ async function handleReorder(songId: string, direction: ReorderDirection) {
   reorderingIds.value.add(songId)
   await reorderSong(songId, direction)
   reorderingIds.value.delete(songId)
+}
+
+async function handleJump(songId: string) {
+  jumpingIds.value.add(songId)
+  await jumpToSong(songId)
+  jumpingIds.value.delete(songId)
 }
 </script>
 
@@ -51,6 +58,7 @@ async function handleReorder(songId: string, direction: ReorderDirection) {
               v-for="song in store.historySongs"
               :key="song.id"
               :song="song"
+              @jump="handleJump"
             />
           </div>
         </div>
@@ -93,9 +101,10 @@ async function handleReorder(songId: string, direction: ReorderDirection) {
               :position="index + 1"
               :is-first="index === 0"
               :is-last="index === store.queuedSongs.length - 1"
-              :is-deleting="deletingIds.has(song.id) || reorderingIds.has(song.id)"
+              :is-deleting="deletingIds.has(song.id) || reorderingIds.has(song.id) || jumpingIds.has(song.id)"
               @delete="handleDelete"
               @reorder="handleReorder"
+              @jump="handleJump"
             />
           </div>
         </div>

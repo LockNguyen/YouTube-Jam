@@ -7,10 +7,17 @@ interface Props {
 }
 
 defineProps<Props>()
+
+const emit = defineEmits<{
+  jump: [songId: string]
+}>()
 </script>
 
 <template>
-  <div class="flex items-center gap-3 px-3 py-2.5 opacity-70">
+  <div
+    class="flex items-center gap-3 px-3 py-2.5 opacity-70 hover:opacity-100 hover:bg-white/5 rounded-lg cursor-pointer transition-all"
+    @click="emit('jump', song.id)"
+  >
     <!-- Thumbnail -->
     <img
       v-if="song.thumbnailUrl"

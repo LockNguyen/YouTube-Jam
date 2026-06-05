@@ -1,19 +1,11 @@
 import { adminDb } from './firebaseAdmin'
-import type { Song, SongStatus, QueueState } from '../../src/types/song'
+import type { Song } from '../../src/types/song'
+import { cleanSongTitle } from './youtubeService'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function now(): number {
   return Date.now()
-}
-
-async function getAllSongs(roomId: string): Promise<Song[]> {
-  const snap = await adminDb.ref(`rooms/${roomId}/songs`).once('value')
-  if (!snap.exists()) return []
-  const raw = snap.val() as Record<string, Omit<Song, 'id'>>
-  return Object.entries(raw)
-    .map(([id, data]) => ({ id, ...data }))
-    .filter((s) => typeof s.order === 'number' && !isNaN(s.order) && s.videoId)
 }
 
 // ─── Queue service ────────────────────────────────────────────────────────────
@@ -26,6 +18,7 @@ export async function addSong(
   guestId: string,
   name: string,
   color: string,
+  isNonEmbeddable: boolean = false,
 ): Promise<string> {
   const songsRef = adminDb.ref(`rooms/${roomId}/songs`)
   const newSongRef = songsRef.push()
@@ -33,7 +26,7 @@ export async function addSong(
 
   const song: Omit<Song, 'id'> = {
     videoId,
-    title,
+    title: title ? cleanSongTitle(title) : 'Unknown Song',
     thumbnailUrl,
     status: 'queued',
     order: 0, // set dynamically inside transaction
@@ -44,6 +37,7 @@ export async function addSong(
     startedAt: null,
     endedAt: null,
     deletedAt: null,
+    isNonEmbeddable,
   }
 
   await songsRef.transaction((currentSongs) => {
@@ -337,3 +331,76 @@ export async function performReorder(
   if (!result.ok) return result
   return { ok: true }
 }
+
+export async function performJumpToSong(roomId: string, songId: string): Promise<void> {
+  const roomRef = adminDb.ref(`rooms/${roomId}`)
+
+  await roomRef.transaction((currentRoom) => {
+    if (!currentRoom) return {}
+
+    const songsRaw = currentRoom.songs || {}
+    const stateRaw = currentRoom.state || {}
+
+    // 1. Get all active (not deleted) songs in the room
+    const songsList = Object.entries(songsRaw)
+      .map(([id, data]) => ({ id, ...(data as any) }))
+      .filter((s) => s.status !== 'deleted')
+
+    // 2. Separate them into played/skipped, playing, and queued
+    const history = songsList
+      .filter((s) => s.status === 'played' || s.status === 'skipped')
+      .sort((a, b) => Number(a.endedAt || 0) - Number(b.endedAt || 0))
+
+    const playing = songsList.filter((s) => s.status === 'playing')
+
+    const queued = songsList
+      .filter((s) => s.status === 'queued')
+      .sort((a, b) => Number(a.order || 0) - Number(b.order || 0))
+
+    // 3. Construct the full chronological/queue sequence
+    const fullSequence = [...history, ...playing, ...queued]
+
+    // 4. Find the index of the target song to jump to
+    const targetIdx = fullSequence.findIndex((s) => s.id === songId)
+    if (targetIdx === -1) {
+      return currentRoom
+    }
+
+    // 5. Update statuses and orders based on sequence position relative to targetIdx
+    let orderCounter = 1000
+
+    fullSequence.forEach((song, index) => {
+      const dbSong = songsRaw[song.id]
+      if (!dbSong) return
+
+      if (index < targetIdx) {
+        // All songs previous to the target song go to history (played)
+        if (dbSong.status !== 'played' && dbSong.status !== 'skipped') {
+          dbSong.status = 'played'
+          dbSong.endedAt = now()
+        }
+      } else if (index === targetIdx) {
+        // Target song becomes currently playing
+        dbSong.status = 'playing'
+        dbSong.startedAt = now()
+        dbSong.endedAt = null
+      } else {
+        // All songs following the target song go to "Up Next" (queued)
+        dbSong.status = 'queued'
+        dbSong.startedAt = null
+        dbSong.endedAt = null
+        dbSong.order = orderCounter
+        orderCounter += 1000
+      }
+    })
+
+    // 6. Update the active currentSongId in state
+    stateRaw.currentSongId = songId
+    stateRaw.updatedAt = now()
+
+    currentRoom.songs = songsRaw
+    currentRoom.state = stateRaw
+    return currentRoom
+  })
+}
+
