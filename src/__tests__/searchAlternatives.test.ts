@@ -46,10 +46,28 @@ describe('searchAlternatives Netlify function', () => {
       const urlStr = typeof url === 'string' ? url : url.toString()
 
       if (urlStr.includes('youtube.com/oembed')) {
-        if (urlStr.includes('alt2')) {
-          return { status: 401 } as Response // Not embeddable
-        }
-        return { status: 200 } as Response // Embeddable
+        const isEmbeddable = !urlStr.includes('alt2')
+        return {
+          ok: true,
+          status: isEmbeddable ? 200 : 401,
+          json: async () => ({
+            title: urlStr.includes('original_id') ? 'Let It Go [Official Video]' : 'Alternative Title'
+          })
+        } as Response
+      }
+
+      if (urlStr.includes('googleapis.com/youtube/v3/videos')) {
+        expect(urlStr).toContain('key=mock-youtube-api-key')
+        expect(urlStr).toContain('id=original_id')
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            items: [
+              { snippet: { title: 'Let It Go [Official Video]' } }
+            ]
+          })
+        } as Response
       }
 
       if (urlStr.includes('youtube.com/watch?v=')) {
@@ -75,7 +93,12 @@ describe('searchAlternatives Netlify function', () => {
         } as Response
       }
 
-      return { ok: false, status: 404 } as Response
+      return {
+        ok: false,
+        status: 404,
+        text: async () => 'Not Found',
+        json: async () => ({})
+      } as Response
     })
 
     const event = {
@@ -101,10 +124,14 @@ describe('searchAlternatives Netlify function', () => {
       const urlStr = typeof url === 'string' ? url : url.toString()
 
       if (urlStr.includes('youtube.com/oembed')) {
-        if (urlStr.includes('alt4')) {
-          return { status: 401 } as Response // Not embeddable
-        }
-        return { status: 200 } as Response // Embeddable
+        const isEmbeddable = !urlStr.includes('alt4')
+        return {
+          ok: true,
+          status: isEmbeddable ? 200 : 401,
+          json: async () => ({
+            title: urlStr.includes('original_id') ? 'Let It Go (MV)' : 'Alternative'
+          })
+        } as Response
       }
 
       if (urlStr.includes('youtube.com/watch?v=')) {
@@ -126,7 +153,12 @@ describe('searchAlternatives Netlify function', () => {
         } as Response
       }
 
-      return { ok: false, status: 404 } as Response
+      return {
+        ok: false,
+        status: 404,
+        text: async () => 'Not Found',
+        json: async () => ({})
+      } as Response
     })
 
     const event = {

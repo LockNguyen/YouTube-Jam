@@ -35,10 +35,30 @@ describe('youtubeService - cleanSongTitle', () => {
 
   it('preserves useful parenthetical context if not matching noise keywords', () => {
     const input = 'Sầu Tím Thiệp Hồng (Remix) - Quang Lê'
-    // 'Remix' is in metadata keywords, so it should discard that part or clean it
-    // Wait, let's see what this input evaluates to
     const res = cleanSongTitle(input)
     expect(res).toBeDefined()
+  })
+
+  it('handles user name parsing edge cases accurately', () => {
+    // Case 1: "I Just Can't Wait to Be King - The Lion King (1994 film) | Karaoke Version | KaraFun"
+    expect(
+      cleanSongTitle("I Just Can't Wait to Be King - The Lion King (1994 film) | Karaoke Version | KaraFun")
+    ).toBe("I Just Can't Wait to Be King")
+
+    // Case 2: "Love Is An Open Door (Male Part Only - Karaoke) [UPDATED] - Frozen"
+    expect(
+      cleanSongTitle("Love Is An Open Door (Male Part Only - Karaoke) [UPDATED] - Frozen")
+    ).toBe("Love Is An Open Door (Male Part Only)")
+
+    // Case 3: "Frozen 2 - Show Yourself (Karaoke Version)"
+    expect(
+      cleanSongTitle("Frozen 2 - Show Yourself (Karaoke Version)")
+    ).toBe("Show Yourself")
+
+    // Case 4: "Karaoke 4K SEE THE LIGHT - Mỹ Tâm | Beat Chuẩn Tone Nữ | Có Lời HD"
+    expect(
+      cleanSongTitle("Karaoke 4K SEE THE LIGHT - Mỹ Tâm | Beat Chuẩn Tone Nữ | Có Lời HD")
+    ).toBe("See The Light")
   })
 })
 

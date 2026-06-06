@@ -1,7 +1,7 @@
 import type { Handler } from '@netlify/functions'
 import { parseBody, requireString } from '../shared/validation'
 import { success, error, headers } from '../shared/responses'
-import { fetchYoutubeTitle, cleanSongTitle } from '../shared/youtubeService'
+import { resolveVideoTitle, cleanSongTitle } from '../shared/youtubeService'
 
 const INVIDIOUS_INSTANCES = [
   'https://inv.thepixora.com',
@@ -28,6 +28,9 @@ async function fetchInvidiousSearch(query: string): Promise<any[]> {
             title: item.title,
           }))
         }
+      } else {
+        const errText = await res.text().catch(() => '')
+        console.warn(`[searchAlternatives] Search failed on ${instance} with status ${res.status}: ${errText}`)
       }
     } catch (err) {
       console.warn(`[searchAlternatives] Search failed on ${instance}:`, err)
@@ -53,6 +56,9 @@ async function fetchYoutubeSearch(query: string, apiKey: string): Promise<any[]>
           title: item.snippet.title,
         }))
       }
+    } else {
+      const errText = await res.text().catch(() => '')
+      console.error(`[searchAlternatives] YouTube API search failed with status ${res.status}: ${errText}`)
     }
   } catch (err) {
     console.error(`[searchAlternatives] YouTube API search failed:`, err)
@@ -92,7 +98,7 @@ const handler: Handler = async (event) => {
 
   try {
     // 1. Fetch the original video title
-    const originalTitle = await fetchYoutubeTitle(videoId)
+    const originalTitle = await resolveVideoTitle(videoId)
     if (!originalTitle) {
       return { ...success({ alternatives: [] }), headers }
     }
@@ -104,6 +110,7 @@ const handler: Handler = async (event) => {
 
     // 2. Execute search
     const apiKey = process.env.YOUTUBE_API_KEY
+    console.log('[searchAlternatives] YOUTUBE_API_KEY configured:', !!apiKey)
     let candidates: any[] = []
 
     if (apiKey) {

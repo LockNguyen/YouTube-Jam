@@ -1,146 +1,239 @@
 export function toTitleCase(str: string): string {
   if (!str) return ''
-  return str
-    .toLowerCase()
-    .replace(/(?:^|[^a-z\u00C0-\u1EF9]+)([a-z\u00C0-\u1EF9])/gi, (m) => m.toUpperCase())
+  
+  const minorWords = new Set([
+    'and', 'but', 'or', 'for', 'nor', 'on', 'in', 'at', 'to', 'by', 'of', 'with'
+  ])
+
+  // Split by spaces, preserving them
+  const tokens = str.split(/(\s+)/)
+  const words = tokens.filter(Boolean)
+  
+  const processedWords = words.map((word, index) => {
+    if (/^\s+$/.test(word)) return word
+    
+    // Check if first or last non-whitespace word
+    const isFirst = index === 0 || (index === 1 && /^\s+$/.test(words[0]!))
+    const isLast = index === words.length - 1 || (index === words.length - 2 && /^\s+$/.test(words[words.length - 1]!))
+    
+    // Strip punctuation to check if it's a minor word
+    const cleanWord = word.replace(/[^a-zA-Z0-9\u00C0-\u1EF9]/gi, '').toLowerCase()
+    
+    if (minorWords.has(cleanWord) && !isFirst && !isLast) {
+      return word.toLowerCase()
+    }
+    
+    // Capitalize the first alphabetical character, lowercase the rest
+    const match = word.match(/[a-zA-Z\u00C0-\u1EF9]/)
+    if (!match) return word
+    const idx = match.index!
+    return word.slice(0, idx) + word.charAt(idx).toUpperCase() + word.slice(idx + 1).toLowerCase()
+  })
+  
+  return processedWords.join('')
+}
+
+const noiseKeywords = [
+  'karaoke', 'kara', 'instrumental', 'lyrics', 'backing', 'vocal', 'vocals',
+  'version', 'cover', 'tribute', 'originally', 'popularized', 'style',
+  'sing king', 'singking', 'karafun', 'sunfly', 'zoom', 'cc', 'original',
+  'official', 'video', 'mv', 'audio', 'clip', 'lyrics video', 'updated', '4k',
+  'hd', 'beat', 'có lời', 'chữ', 'beat chuẩn', 'chuẩn', 'tone', 'hát',
+  'công diễn', 'live', 'tập', 'season', 'remix', 'performance'
+]
+
+const discardPartKeywords = [
+  'popularized', 'originally', 'performed', 'tribute', 'style of', 'style',
+  'cover', 'backing track', 'backing tracks', 'sing along', 'sing-along', 'with lyrics', 'no vocals'
+]
+
+function escapeRegExp(string: string): string {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+// Clean standalone noise keywords from a string with unicode word boundaries
+export function cleanNoiseWords(str: string): string {
+  let cleaned = str
+  for (const keyword of noiseKeywords) {
+    const escaped = escapeRegExp(keyword)
+    const regex = new RegExp(`(^|[^a-zA-Z0-9\\u00C0-\\u1EF9]+)${escaped}([^a-zA-Z0-9\\u00C0-\\u1EF9]+|$)`, 'gi')
+    cleaned = cleaned.replace(regex, (match, p1, p2) => {
+      if (p1 && p2) {
+        return p1.trim() && p2.trim() ? `${p1}${p2}` : ' '
+      }
+      return ' '
+    })
+  }
+  return cleaned.replace(/\s+/g, ' ').trim()
+}
+
+function isPureNoise(content: string): boolean {
+  const cleaned = cleanNoiseWords(content)
+  const letters = cleaned.replace(/[^a-z\u00C0-\u1EF9]/gi, '')
+  return letters.length < 2
+}
+
+export function cleanParentheses(title: string): string {
+  let current = title
+  for (let depth = 0; depth < 5; depth++) {
+    const next = current.replace(/([\(\[\{])([^\(\)\[\]\{\}]+)([\)\]\}])/g, (match, openChar, content, closeChar) => {
+      if (isPureNoise(content)) {
+        return ''
+      } else {
+        const cleanedContent = cleanNoiseWords(content)
+        return `${openChar}${cleanedContent}${closeChar}`
+      }
+    })
+    if (next === current) break
+    current = next
+  }
+  return current
+}
+
+function splitTitle(title: string): string[] {
+  const parts: string[] = []
+  let current = ''
+  let parenDepth = 0
+  
+  for (let i = 0; i < title.length; i++) {
+    const char = title[i]!
+    if (char === '(' || char === '[' || char === '{') {
+      parenDepth++
+      current += char
+    } else if (char === ')' || char === ']' || char === '}') {
+      parenDepth = Math.max(0, parenDepth - 1)
+      current += char
+    } else if (parenDepth === 0 && (char === '-' || char === '|' || char === '/' || char === '\\' || char === '–' || char === '—')) {
+      if (current.trim()) {
+        parts.push(current.trim())
+      }
+      current = ''
+    } else {
+      current += char
+    }
+  }
+  if (current.trim()) {
+    parts.push(current.trim())
+  }
+  return parts
 }
 
 export function cleanSongTitle(title: string): string {
   if (!title) return ''
 
-  // 1. Split into parts by delimiters
-  const rawParts = title.split(/[-|/\\\u2013\u2014]+/)
-  const cleanedParts: string[] = []
+  // 1. Clean parentheses/brackets first
+  const cleanedTitle = cleanParentheses(title)
 
-  const noiseKeywords = [
-    'karaoke',
-    'kara',
-    'instrumental',
-    'lyrics',
-    'backing',
-    'vocal',
-    'version',
-    'cover',
-    'tribute',
-    'originally',
-    'popularized',
-    'style',
-    'sing king',
-    'karafun',
-    'sunfly',
-    'zoom',
-    'cc',
-    'original',
-    'key',
-    'pitch',
-    'low',
-    'high',
-    'male',
-    'female',
-    'duet',
-    'backing vocals',
-    'backing vocal',
-    'official',
-    'video',
-    'mv',
-    'audio',
-    'clip',
-    'lyrics video',
-  ]
+  // 2. Split both original and cleaned titles by delimiters that are NOT inside parentheses
+  const originalParts = splitTitle(title)
+  const parts = splitTitle(cleanedTitle)
 
-  // Regular expression to match parenthesized expressions containing noise keywords
-  const parenthesizedNoise = new RegExp(
-    `\\s*[\\(\\[\\{][^\\)\\]\\{]*(?:${noiseKeywords.join('|')})[^\\)\\]\\{]*[\\)\\]\\}]`,
-    'gi',
-  )
+  // 3. For each part, calculate if it is substantial and calculate its score
+  const substantialParts: { original: string; cleaned: string; score: number }[] = []
 
-  rawParts.forEach((part) => {
-    // A. Strip parenthesized noise from the part
-    let cleanedPart = part.replace(parenthesizedNoise, '').trim()
+  for (let i = 0; i < parts.length; i++) {
+    const rawPart = parts[i]!
+    const originalPart = originalParts[i] || rawPart
+    const lowerRaw = rawPart.toLowerCase()
+    const lowerOriginal = originalPart.toLowerCase()
+    
+    // Check if the part should be discarded entirely (attributions like covers, tributes, popularised by)
+    const shouldDiscard = discardPartKeywords.some((keyword) => lowerRaw.includes(keyword) || lowerOriginal.includes(keyword))
+    if (shouldDiscard) {
+      continue
+    }
 
-    // B. If the part is now empty, discard it
-    if (!cleanedPart) return
+    // Check if the part looks like an artist list (contains comma, ampersand, feat, ft, etc.)
+    const isArtistList = rawPart.includes(',') || lowerRaw.includes('&') || /\b(?:feat|ft|collab|collaboration|x)\b/i.test(lowerRaw)
+    if (isArtistList) {
+      continue
+    }
 
-    // C. Check if the part contains metadata/show/karaoke boilerplate keywords
-    const lowerPart = cleanedPart.toLowerCase()
-    const metadataKeywords = [
-      'công diễn',
-      'live',
-      'tập',
-      'season',
-      'remix',
-      'show',
-      'performance',
-      'lyric',
-      'mv',
-      'official',
-      'karaoke',
-      'sing king',
-      'karafun',
-      'hát',
-      'tone',
-      'backing',
-      'instrumental',
-      'cover',
-      'tribute',
-    ]
-    const hasMetadata = metadataKeywords.some((keyword) => lowerPart.includes(keyword))
-    if (hasMetadata) return
+    // Check if original part contained any karaoke keywords (check originalPart before parentheses were stripped!)
+    const hasKaraokeKeyword = ['karaoke', 'beat', 'karafun', 'sing king', 'singking'].some(
+      (keyword) => lowerOriginal.includes(keyword)
+    )
 
-    cleanedParts.push(cleanedPart)
-  })
-
-  // 2. Identify and filter artist lists
-  // Artist lists usually contain commas, ampersands, feat/ft, or x collaborations
-  let songParts = cleanedParts.filter((part) => {
-    const lower = part.toLowerCase()
-
-    // Check for collaborations/artist list indicators
-    const isArtistList =
-      part.includes(',') ||
-      lower.includes('&') ||
-      /\b(?:feat|ft|collab|collaboration|x)\b/i.test(lower)
-
-    return !isArtistList
-  })
-
-  // Fallback if we filtered out everything
-  if (songParts.length === 0) {
-    songParts = cleanedParts
+    const cleanedPart = cleanNoiseWords(rawPart)
+    
+    // Check if substantial
+    const letters = cleanedPart.replace(/[^a-z\u00C0-\u1EF9]/gi, '')
+    if (letters.length >= 2) {
+      const wordCount = cleanedPart.split(/\s+/).filter(Boolean).length
+      let score = wordCount
+      if (hasKaraokeKeyword) {
+        score += 10
+      }
+      substantialParts.push({
+        original: rawPart,
+        cleaned: cleanedPart,
+        score
+      })
+    }
   }
 
-  // 3. Extract the final song title candidate
-  let finalTitle = ''
-  if (songParts.length > 0) {
-    if (songParts.length > 1) {
-      const part1 = songParts[0]!.trim()
-      const part2 = songParts[1]!.trim()
-      const p1Words = part1.split(/\s+/).length
-      const p2Words = part2.split(/\s+/).length
+  // Fallback if no substantial parts found
+  if (substantialParts.length === 0) {
+    return toTitleCase(cleanNoiseWords(title)) || toTitleCase(title)
+  }
 
-      // If Part 1 looks like a short name (<= 2 words) and Part 2 is longer, Part 2 is probably the song name
-      // e.g. "Mỹ Linh - Tôi Không Còn Viết Tình Ca"
-      if (p1Words <= 2 && p2Words > p1Words) {
-        finalTitle = part2
+  // Sort by score descending to find the best candidate
+  substantialParts.sort((a, b) => b.score - a.score)
+  const bestPart = substantialParts[0]!.cleaned
+
+  return toTitleCase(bestPart)
+}
+
+// Resolve title via official YouTube API, oEmbed API, or HTML watch page scraper
+export async function resolveVideoTitle(videoId: string): Promise<string | null> {
+  const apiKey = process.env.YOUTUBE_API_KEY
+
+  // 1. YouTube Data API
+  if (apiKey) {
+    try {
+      const url = `https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${videoId}&key=${apiKey}`
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 4000)
+      const res = await fetch(url, { signal: controller.signal })
+      clearTimeout(timeoutId)
+      if (res.ok) {
+        const data = typeof res.json === 'function' ? await res.json() : null
+        const title = data?.items?.[0]?.snippet?.title
+        if (title) {
+          console.log(`[resolveVideoTitle] Retrieved title from YouTube API: ${title}`)
+          return title
+        }
       } else {
-        finalTitle = part1
+        const errText = typeof res.text === 'function' ? await res.text().catch(() => '') : ''
+        console.warn(`[resolveVideoTitle] YouTube API videos lookup failed: status ${res.status}: ${errText}`)
+      }
+    } catch (err) {
+      console.warn(`[resolveVideoTitle] YouTube API videos lookup failed:`, err)
+    }
+  }
+
+  // 2. oEmbed API (not blocked on server environments)
+  try {
+    const url = `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 3000)
+    const res = await fetch(url, { signal: controller.signal })
+    clearTimeout(timeoutId)
+    if (res.ok) {
+      const data = typeof res.json === 'function' ? await res.json() : null
+      if (data && typeof data.title === 'string') {
+        console.log(`[resolveVideoTitle] Retrieved title from oEmbed API: ${data.title}`)
+        return data.title
       }
     } else {
-      finalTitle = songParts[0]!.trim()
+      console.warn(`[resolveVideoTitle] oEmbed title lookup failed: status ${res.status}`)
     }
-  } else {
-    finalTitle = title
+  } catch (err) {
+    console.warn(`[resolveVideoTitle] oEmbed title lookup failed:`, err)
   }
 
-  // 4. Clean up any remaining noise and case it to Title Case
-  finalTitle = finalTitle
-    .replace(/\b(karaoke|instrumental|version|lyrics|backing vocals|sing king|karafun|official)\b/gi, '')
-    .replace(/^\s*[-:|/\\+]\s*/, '')
-    .replace(/\s*[-:|/\\+]\s*$/, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-
-  return toTitleCase(finalTitle) || toTitleCase(title)
+  // 3. Fallback to HTML scraper
+  return fetchYoutubeTitle(videoId)
 }
 
 // Scrape HTML watch page and extract the video title
@@ -173,7 +266,7 @@ export async function fetchYoutubeTitle(videoId: string): Promise<string | null>
 export async function fetchYoutubeInfoFromServer(
   videoId: string,
 ): Promise<{ title: string; thumbnailUrl: string } | null> {
-  const title = await fetchYoutubeTitle(videoId)
+  const title = await resolveVideoTitle(videoId)
   if (!title) return null
   return {
     title,
