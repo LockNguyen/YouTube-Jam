@@ -15,7 +15,7 @@ const props = defineProps<Props>()
       <div class="mx-auto flex h-14 max-w-lg items-center justify-between px-4">
         <div class="flex items-center gap-3">
           <span class="text-xl">🎤</span>
-          <h1 class="text-base font-semibold gradient-text">Karaoke Queue</h1>
+          <h1 class="text-base font-semibold gradient-text">YouTube Jam</h1>
         </div>
         <slot name="header-right" />
       </div>
