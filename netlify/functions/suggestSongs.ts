@@ -47,6 +47,9 @@ async function fetchInvidiousSearch(
           }))
           return { items, nextPage: page + 1 }
         }
+      } else {
+        const errText = await res.text().catch(() => '')
+        console.warn(`[suggestSongs] Search failed on ${instance} with status ${res.status}: ${errText}`)
       }
     } catch (err) {
       console.warn(`[suggestSongs] Search failed on ${instance}:`, err)
@@ -80,6 +83,9 @@ async function fetchYoutubeSearch(
         }))
         return { items, nextPageToken: data.nextPageToken }
       }
+    } else {
+      const errText = await res.text()
+      console.error(`[suggestSongs] YouTube API search failed with status ${res.status}: ${errText}`)
     }
   } catch (err) {
     console.error(`[suggestSongs] YouTube API search failed:`, err)
@@ -116,6 +122,9 @@ async function fetchInvidiousRelated(
             nextPage: hasNextPage ? page + 1 : undefined,
           }
         }
+      } else {
+        const errText = await res.text().catch(() => '')
+        console.warn(`[suggestSongs] Related fetch failed on ${instance} with status ${res.status}: ${errText}`)
       }
     } catch (err) {
       console.warn(`[suggestSongs] Related fetch failed on ${instance}:`, err)
@@ -152,6 +161,9 @@ async function fetchYoutubeRelated(
           nextPageToken: data.nextPageToken,
         }
       }
+    } else {
+      const errText = await res.text()
+      console.warn(`[suggestSongs] YouTube relatedToVideoId failed with status ${res.status}: ${errText}`)
     }
   } catch (err) {
     console.warn('[suggestSongs] YouTube relatedToVideoId search failed, trying title search fallback:', err)
@@ -181,6 +193,9 @@ async function fetchYoutubeRelated(
             nextPageToken: data.nextPageToken,
           }
         }
+      } else {
+        const errText = await res.text()
+        console.error(`[suggestSongs] YouTube related fallback search failed with status ${res.status}: ${errText}`)
       }
     } catch (err) {
       console.error('[suggestSongs] YouTube title search fallback failed:', err)
@@ -221,6 +236,7 @@ const handler: Handler = async (event) => {
     const existingVideoIds = new Set(activeOrHistory.map((s) => s.videoId))
 
     const apiKey = process.env.YOUTUBE_API_KEY
+    console.log('[suggestSongs] YOUTUBE_API_KEY configured:', !!apiKey)
     let searchResult: { items: any[]; nextPageToken?: string; nextPage?: number } = { items: [] }
 
     // 2. Apply heuristics for recommendation

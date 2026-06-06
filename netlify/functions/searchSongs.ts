@@ -32,6 +32,9 @@ async function fetchInvidiousSearch(
           }))
           return { items, nextPage: page + 1 }
         }
+      } else {
+        const errText = await res.text().catch(() => '')
+        console.warn(`[searchSongs] Search failed on ${instance} with status ${res.status}: ${errText}`)
       }
     } catch (err) {
       console.warn(`[searchSongs] Search failed on ${instance}:`, err)
@@ -65,6 +68,9 @@ async function fetchYoutubeSearch(
         }))
         return { items, nextPageToken: data.nextPageToken }
       }
+    } else {
+      const errText = await res.text()
+      console.error(`[searchSongs] YouTube search API failed with status ${res.status}: ${errText}`)
     }
   } catch (err) {
     console.error(`[searchSongs] YouTube API search failed:`, err)
@@ -111,6 +117,7 @@ const handler: Handler = async (event) => {
 
     // 1. Execute search
     const apiKey = process.env.YOUTUBE_API_KEY
+    console.log('[searchSongs] YOUTUBE_API_KEY configured:', !!apiKey)
     let searchResult: { items: any[]; nextPageToken?: string; nextPage?: number } = {
       items: [],
     }
