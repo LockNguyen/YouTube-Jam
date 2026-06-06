@@ -86,10 +86,10 @@ export const useQueueStore = defineStore('queue', () => {
 
   const skippedSongs = computed(() => songs.value.filter((s) => s.status === 'skipped'))
 
-  /** All played/skipped songs sorted by most recently ended */
+  /** All played/skipped songs sorted by endedAt ascending (oldest ended first) */
   const historySongs = computed(() =>
     [...playedSongs.value, ...skippedSongs.value].sort(
-      (a, b) => (b.endedAt ?? b.startedAt ?? 0) - (a.endedAt ?? a.startedAt ?? 0),
+      (a, b) => (a.endedAt ?? a.startedAt ?? 0) - (b.endedAt ?? b.startedAt ?? 0),
     ),
   )
 

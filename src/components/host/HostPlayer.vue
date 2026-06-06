@@ -23,6 +23,7 @@ const skipNoticeText = ref('')
 
 // Auto-open countdown redirect state
 const isAutoOpening = ref(false)
+const isPopupBlocked = ref(false)
 const secondsLeft = ref(2)
 const countdownInterval = ref<number | null>(null)
 const redirectTimeout = ref<number | null>(null)
@@ -165,8 +166,24 @@ function scheduleEndTimeout(current: number, endLimit: number) {
 
 function handleSkipIntro() {
   if (store.currentSong?.isNonEmbeddable) {
-    stopIntro()
-    startRedirectCountdown()
+    const youtubeUrl = `https://www.youtube.com/watch?v=${store.currentSong.videoId}`
+    let win: Window | null = null
+    let blocked = false
+    try {
+      win = window.open(youtubeUrl, '_blank')
+      if (!win || win.closed || typeof win.closed === 'undefined') {
+        blocked = true
+      }
+    } catch (e) {
+      // If cross-origin security throws, the window was successfully opened
+      blocked = false
+    }
+
+    cancelRedirect()
+    skipIntro()
+    isAutoOpening.value = false
+    isPopupBlocked.value = blocked
+    hasPlaybackError.value = true
   } else {
     skipIntro()
   }
@@ -183,6 +200,7 @@ function startRedirectCountdown() {
 
   isAutoOpening.value = true
   secondsLeft.value = 2
+  isPopupBlocked.value = false
 
   const youtubeUrl = `https://www.youtube.com/watch?v=${store.currentSong.videoId}`
 
@@ -197,8 +215,20 @@ function startRedirectCountdown() {
   }, 1000)
 
   redirectTimeout.value = window.setTimeout(() => {
-    window.open(youtubeUrl, '_blank')
+    let win: Window | null = null
+    let blocked = false
+    try {
+      win = window.open(youtubeUrl, '_blank')
+      if (!win || win.closed || typeof win.closed === 'undefined') {
+        blocked = true
+      }
+    } catch (e) {
+      // If cross-origin security throws, the window was successfully opened
+      blocked = false
+    }
+
     isAutoOpening.value = false
+    isPopupBlocked.value = blocked
     hasPlaybackError.value = true // Show manual fallback overlay after redirect
   }, 2000)
 }
@@ -224,7 +254,7 @@ function handleCancelRedirect() {
 watch(
   () => introState.value.isRunning,
   (isRunning, wasRunning) => {
-    if (wasRunning && !isRunning && store.currentSong?.isNonEmbeddable) {
+    if (wasRunning && !isRunning && store.currentSong?.isNonEmbeddable && !hasPlaybackError.value) {
       startRedirectCountdown()
     }
   }
@@ -235,6 +265,7 @@ watch(
   () => store.currentSongId,
   (newSongId) => {
     hasPlaybackError.value = false
+    isPopupBlocked.value = false
     rawSegments.value = []
     songStartOffset.value = 0
     songEndLimit.value = null
@@ -348,8 +379,8 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="relative h-full w-full bg-black transition-all duration-1500 ease-in-out"
-    :class="introState.isZoomed ? 'scale-200 translate-y-1/4' : 'scale-100 translate-y-0'">
+  <div class="relative h-full w-full bg-black transition-all duration-25 ease-in-out"
+    :class="introState.isZoomed ? 'scale-200 translate-y-1/4' : 'scale-100 translate-y-0 duration-4000'">
     <!-- YouTube player container -->
     <div :id="PLAYER_ID" class="absolute inset-0 h-full w-full" />
 
@@ -383,9 +414,15 @@ onUnmounted(() => {
     >
       <span class="text-5xl">⚠️</span>
       <h2 class="mt-4 text-lg font-semibold text-white">Playback Blocked on YouTube</h2>
-      <p class="mt-2 max-w-sm text-xs text-zinc-400">
+      
+      <div v-if="isPopupBlocked" class="mt-3 max-w-md rounded-xl bg-red-500/10 border border-red-500/20 px-4 py-3 text-xs text-red-400">
+        <p class="font-bold mb-1">Pop-up Blocked by Browser</p>
+        <p>We tried to open the video in a new tab, but your browser blocked it. Please enable pop-ups for this site, or click the button below to open it manually.</p>
+      </div>
+      <p v-else class="mt-2 max-w-sm text-xs text-zinc-400">
         This video might have embedding disabled by the publisher, or is unavailable in embeds. Open it directly on YouTube:
       </p>
+
       <div class="mt-6 flex gap-3 pointer-events-auto">
         <a
           :href="`https://www.youtube.com/watch?v=${store.currentSong.videoId}`"

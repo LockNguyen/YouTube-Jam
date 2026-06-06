@@ -84,7 +84,7 @@ export function usePerformanceIntro(player: {
       isRunning: true,
       isTitleVisible: false,
       isArtistVisible: false,
-      isDimmed: true,
+      isDimmed: false,
       isZoomed: true,
       currentSongId: songId,
     }
@@ -106,9 +106,7 @@ export function usePerformanceIntro(player: {
       // 5.0s mark: Zoom out video, apply dimming overlay
       timeouts.push(window.setTimeout(() => {
         if (!state.value.isRunning) return
-        state.value.isDimmed = true
         state.value.isZoomed = false
-        playSwoosh()
 
         // 5.5s mark: Fade in title
         timeouts.push(window.setTimeout(() => {
@@ -120,38 +118,25 @@ export function usePerformanceIntro(player: {
         timeouts.push(window.setTimeout(() => {
           if (!state.value.isRunning) return
           playSwoosh()
-        }, 550))
+        }, 700))
+
+        // 5.5s mark: Darken the screen
+        timeouts.push(window.setTimeout(() => {
+          if (!state.value.isRunning) return
+          state.value.isDimmed = true
+        }, 700))
 
         // 9.3s mark: Switch title to performer name
         timeouts.push(window.setTimeout(() => {
           if (!state.value.isRunning) return
-          state.value.isTitleVisible = false
           state.value.isArtistVisible = true
-        }, 3800))
+        }, 1500))
 
         // Performer swoosh effect
         timeouts.push(window.setTimeout(() => {
           if (!state.value.isRunning) return
           playSwoosh()
-        }, 3850))
-
-        // 11.3s mark: Hide performer name
-        timeouts.push(window.setTimeout(() => {
-          if (!state.value.isRunning) return
-          state.value.isArtistVisible = false
-        }, 5800))
-
-        // Outro swoosh effect
-        timeouts.push(window.setTimeout(() => {
-          if (!state.value.isRunning) return
-          playSwoosh()
-        }, 5850))
-
-        // 10.5s mark: Undim screen
-        timeouts.push(window.setTimeout(() => {
-          if (!state.value.isRunning) return
-          state.value.isDimmed = false
-        }, 5000))
+        }, 1700))
 
         // Audio fade calculations proportional to starting volume
         const fade = (ratio: number) => {
@@ -174,8 +159,9 @@ export function usePerformanceIntro(player: {
 
       // 12.0s mark: Exit intro and start song
       timeouts.push(window.setTimeout(() => {
+        state.value.isDimmed = false
         skipIntro(songStartOffset.value)
-      }, 6500))
+      }, 7500))
 
     }, 1000))
   }

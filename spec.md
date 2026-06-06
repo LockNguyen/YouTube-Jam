@@ -65,7 +65,7 @@ interface QueueState {
   * `queuedSongs`: Sorts songs with `status === 'queued'` by `order` ascending.
   * `playedSongs`: Filter for status `'played'`.
   * `skippedSongs`: Filter for status `'skipped'`.
-  * `historySongs`: Concat of played/skipped, sorted by `endedAt` descending.
+  * `historySongs`: Concat of played/skipped, sorted by `endedAt` ascending (oldest top, newest bottom).
   * `visibleSongs`: Filter out `status === 'deleted'`.
   * `nextSong`: First item in `queuedSongs`.
 
