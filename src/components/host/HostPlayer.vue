@@ -24,6 +24,7 @@ const skipNoticeText = ref('')
 // Auto-open countdown redirect state
 const isAutoOpening = ref(false)
 const isPopupBlocked = ref(false)
+const isSettingNextSong = ref(false)
 const secondsLeft = ref(2)
 const countdownInterval = ref<number | null>(null)
 const redirectTimeout = ref<number | null>(null)
@@ -363,6 +364,25 @@ watch(isReady, (ready) => {
     }
   }
 })
+
+// Automatically resume playback if there is no current song and a new song is queued
+watch(
+  () => store.nextSong,
+  async (nextSong) => {
+    if (!store.currentSongId && nextSong && !isSettingNextSong.value) {
+      isSettingNextSong.value = true
+      console.log('[HostPlayer] Auto-resuming queue with new song:', nextSong.title)
+      try {
+        await setNowPlaying(nextSong.id)
+      } catch (err) {
+        console.error('[HostPlayer] Failed to auto-resume song:', err)
+      } finally {
+        isSettingNextSong.value = false
+      }
+    }
+  },
+  { immediate: true }
+)
 
 onMounted(async () => {
   await init(PLAYER_ID)
